@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-0 libasound2-dev libudev-dev \
+            libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libvulkan-dev
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Check tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 --locked | python3 -c 'import json,sys; m=json.load(sys.stdin); print(next(p["version"] for p in m["packages"] if p["name"]=="classicclassics"))')"
+          test "v${version}" = "${GITHUB_REF_NAME}" || {
+            echo "tag ${GITHUB_REF_NAME} does not match Cargo version ${version}" >&2
+            exit 1
+          }
+      - name: Build and package
+        run: |
+          python3 DevUtils/package.py
+          python3 DevUtils/verify_package.py dist/ClassicClassics-*-linux-x64.zip
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassicClassics-linux-x64
+          path: dist/*.zip
+          if-no-files-found: error
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true

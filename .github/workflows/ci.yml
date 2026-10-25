@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          components: rustfmt, clippy
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-0 libasound2-dev libudev-dev \
+            libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libvulkan-dev
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --locked --workspace
+      - name: Headless core tests
+        run: cargo test --locked --no-default-features
+      - name: Headless render smoke
+        run: |
+          cargo run --locked --no-default-features -- \
+            --headless --game asteroids --ticks 240 --autoplay \
+            --screenshot /tmp/classicclassics-asteroids.png \
+            --state /tmp/classicclassics-state.json
+          test -s /tmp/classicclassics-asteroids.png
+          test -s /tmp/classicclassics-state.json

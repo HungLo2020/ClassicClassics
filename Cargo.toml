@@ -1,0 +1,43 @@
+[package]
+name = "classicclassics"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT"
+description = "A Quasar-powered collection of classic arcade games"
+publish = false
+
+[[bin]]
+name = "classicclassics"
+path = "src/main.rs"
+
+[features]
+default = ["desktop", "gamepad", "audio"]
+desktop = [
+  "dep:quasar-window",
+  "quasar-render-2d/gpu",
+  "quasar-render-2d/vulkan",
+]
+gamepad = ["quasar-input/gilrs"]
+audio = ["quasar-audio/native"]
+
+[dependencies]
+quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", default-features = false }
+quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", default-features = false, features = ["json"] }
+quasar-core = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10" }
+quasar-input = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10" }
+quasar-render-2d = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", default-features = false, features = ["png"] }
+quasar-storage = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10" }
+quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.dev.package.shaderc-sys]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
