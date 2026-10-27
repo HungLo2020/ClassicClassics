@@ -45,6 +45,7 @@ jobs:
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 3
           name: ClassicClassics-linux-x64
           path: dist/*.zip
           if-no-files-found: error
