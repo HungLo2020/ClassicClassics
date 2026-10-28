@@ -1,0 +1,12 @@
+[package]
+name = "classicclassics-pong"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+classicclassics-core.workspace = true
+quasar-render-2d.workspace = true
+serde.workspace = true

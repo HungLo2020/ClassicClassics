@@ -1,39 +1,61 @@
-[package]
-name = "classicclassics"
+[workspace]
+members = [".", "crates/*"]
+default-members = [".", "crates/*"]
+resolver = "3"
+
+[workspace.package]
 version = "1.0.0"
 edition = "2024"
 rust-version = "1.94"
 license = "MIT"
-description = "A Quasar-powered collection of classic arcade games"
 publish = false
 
-[[bin]]
-name = "classicclassics"
-path = "src/main.rs"
-
-[features]
-default = ["desktop", "gamepad", "audio"]
-desktop = [
-  "dep:quasar-window",
-  "quasar-render-2d/gpu",
-  "quasar-render-2d/vulkan",
-]
-gamepad = ["quasar-input/gilrs"]
-audio = ["quasar-audio/native"]
-
-[dependencies]
+[workspace.dependencies]
+quasar-ui = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["render2d"] }
 quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false }
-quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["json"] }
+quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["json", "toml"] }
 quasar-core = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
 quasar-input = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
 quasar-render-2d = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["png"] }
 quasar-storage = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
-quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", optional = true }
+quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tempfile = "3"
+toml = "0.9"
+classicclassics-core = { path = "crates/classicclassics-core" }
+classicclassics-collection = { path = "crates/classicclassics-collection", default-features = false }
+classicclassics-pong = { path = "crates/classicclassics-pong" }
+classicclassics-lunar = { path = "crates/classicclassics-lunar" }
+classicclassics-asteroids = { path = "crates/classicclassics-asteroids" }
+
+[package]
+name = "classicclassics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "A Quasar-powered collection of classic arcade games"
+
+[features]
+default = ["desktop", "gamepad", "audio"]
+desktop = ["dep:quasar-window", "quasar-render-2d/gpu", "quasar-render-2d/vulkan"]
+gamepad = ["quasar-input/gilrs"]
+audio = ["classicclassics-collection/audio"]
+
+[dependencies]
+quasar-ui.workspace = true
+classicclassics-collection.workspace = true
+quasar-config.workspace = true
+quasar-core.workspace = true
+quasar-input.workspace = true
+quasar-render-2d.workspace = true
+quasar-storage.workspace = true
+quasar-window = { workspace = true, optional = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile.workspace = true
 
 [profile.dev.package.shaderc-sys]
 opt-level = 3

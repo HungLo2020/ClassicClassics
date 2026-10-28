@@ -1,11 +1,10 @@
 //! Pong: a deterministic table-tennis simulation with a solo computer opponent
 //! and a local two-player mode.
 
-use crate::audio::Sound;
-use crate::controls::ControlHints;
-use crate::paint::{CORAL, CYAN, CYAN_DIM, DIM, GRID, MUTED, Paint, RED, WHITE};
-use crate::session::{Input, Records};
-use crate::{TICK_HZ, WIDTH};
+use classicclassics_core::ControlHints;
+use classicclassics_core::paint::{CORAL, CYAN, CYAN_DIM, DIM, GRID, MUTED, Paint, RED, WHITE};
+use classicclassics_core::{ArcadeGame, GameInfo, Input, Sound};
+use classicclassics_core::{TICK_HZ, WIDTH};
 use quasar_render_2d::Canvas;
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +66,59 @@ impl Game {
         }
     }
 
-    pub fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
+    fn reset_match(&mut self) {
+        let mode = self.mode;
+        let ticks = self.ticks;
+        *self = Self::new();
+        self.mode = mode;
+        self.ticks = ticks;
+    }
+
+    fn point(&mut self, player: usize, sounds: &mut Vec<Sound>) {
+        self.score[player] += 1;
+        self.rally = 0;
+        self.ball = [CENTER_X, (TOP + BOTTOM) * 0.5];
+        self.velocity = [0.0; 2];
+        self.serve_direction = if player == 0 { -1.0 } else { 1.0 };
+        if self.score[player] >= WIN_SCORE {
+            self.phase = Phase::Finished;
+            self.finish_recorded = true;
+            sounds.push(Sound::Win);
+        } else {
+            self.phase = Phase::Ready;
+            sounds.push(Sound::Score);
+        }
+    }
+}
+
+fn direction(delta: f32, deadzone: f32) -> i8 {
+    if delta > deadzone {
+        1
+    } else if delta < -deadzone {
+        -1
+    } else {
+        0
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Record {
+    pub best_rally: u32,
+    pub wins: u32,
+    pub matches: u32,
+}
+
+impl ArcadeGame for Game {
+    type Record = Record;
+    const INFO: GameInfo = GameInfo {
+        name: "PONG",
+        aliases: &["pong"],
+        tagline: "TWO PADDLES. ONE BALL.",
+        accent: classicclassics_core::paint::CYAN,
+    };
+
+    fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         self.ticks += 1;
         if input.restart {
             self.reset_match();
@@ -182,42 +233,18 @@ impl Game {
         }
     }
 
-    fn reset_match(&mut self) {
-        let mode = self.mode;
-        let ticks = self.ticks;
-        *self = Self::new();
-        self.mode = mode;
-        self.ticks = ticks;
-    }
-
-    fn point(&mut self, player: usize, sounds: &mut Vec<Sound>) {
-        self.score[player] += 1;
-        self.rally = 0;
-        self.ball = [CENTER_X, (TOP + BOTTOM) * 0.5];
-        self.velocity = [0.0; 2];
-        self.serve_direction = if player == 0 { -1.0 } else { 1.0 };
-        if self.score[player] >= WIN_SCORE {
-            self.phase = Phase::Finished;
-            self.finish_recorded = true;
-            sounds.push(Sound::Win);
-        } else {
-            self.phase = Phase::Ready;
-            sounds.push(Sound::Score);
-        }
-    }
-
-    pub fn record(&mut self, records: &mut Records) {
-        records.pong.best_rally = records.pong.best_rally.max(self.longest_rally);
+    fn record(&mut self, records: &mut Record) {
+        records.best_rally = records.best_rally.max(self.longest_rally);
         if self.finish_recorded {
-            records.pong.matches = records.pong.matches.saturating_add(1);
+            records.matches = records.matches.saturating_add(1);
             if self.score[0] >= WIN_SCORE {
-                records.pong.wins = records.pong.wins.saturating_add(1);
+                records.wins = records.wins.saturating_add(1);
             }
             self.finish_recorded = false;
         }
     }
 
-    pub fn autoplay(&self) -> Input {
+    fn autoplay(&self) -> Input {
         Input {
             p1: direction(self.ball[1] - self.paddles[0], 4.0),
             p2: direction(self.ball[1] - self.paddles[1], 4.0),
@@ -228,15 +255,15 @@ impl Game {
         }
     }
 
-    pub fn summary(&self) -> String {
+    fn summary(&self) -> String {
         format!(
             "mode={:?} phase={:?} score={}:{} rally={} best_rally={}",
             self.mode, self.phase, self.score[0], self.score[1], self.rally, self.longest_rally
         )
     }
 
-    pub fn scene(&self, hints: &ControlHints) -> Canvas {
-        let mut paint = Paint::new(WIDTH, crate::HEIGHT);
+    fn scene(&self, hints: &ControlHints) -> Canvas {
+        let mut paint = Paint::new(WIDTH, classicclassics_core::HEIGHT);
         paint.background();
         paint.starfield(0x50A6, 80, [22, 33, 45, 255]);
         paint.text(64.0, 28.0, "PONG", 3.0, WHITE);
@@ -377,15 +404,28 @@ impl Game {
         }
         paint.into_canvas()
     }
-}
 
-fn direction(delta: f32, deadzone: f32) -> i8 {
-    if delta > deadzone {
-        1
-    } else if delta < -deadzone {
-        -1
-    } else {
-        0
+    fn catalog_record(record: &Record) -> (&'static str, String) {
+        ("BEST RALLY", record.best_rally.to_string())
+    }
+
+    fn motif(paint: &mut Paint, cx: f32, cy: f32, accent: [u8; 4]) {
+        use classicclassics_core::paint::{CORAL, CYAN, WHITE};
+        let left = cx - 82.0;
+        let top = cy - 58.0;
+        paint.outline(left, top, 164.0, 116.0, [30, 51, 65, 255]);
+        paint.dashed_line(
+            [cx, top + 6.0],
+            [cx, top + 110.0],
+            6.0,
+            7.0,
+            1.0,
+            [39, 66, 77, 255],
+        );
+        paint.rect(left + 12.0, cy - 21.0, 5.0, 42.0, CYAN);
+        paint.rect(left + 147.0, cy - 14.0, 5.0, 36.0, CORAL);
+        paint.rect(cx + 22.0, cy - 8.0, 7.0, 7.0, WHITE);
+        paint.line([cx - 18.0, cy + 8.0], [cx + 12.0, cy - 13.0], 1.0, accent);
     }
 }
 
@@ -479,7 +519,7 @@ mod tests {
     #[test]
     fn autoplay_rallies_and_records_are_bounded() {
         let mut game = Game::new();
-        let mut records = Records::default();
+        let mut records = Record::default();
         let mut sounds = Vec::new();
         for _ in 0..14_000 {
             let input = game.autoplay();
@@ -487,6 +527,6 @@ mod tests {
             game.record(&mut records);
         }
         assert!(game.longest_rally > 0);
-        assert!(records.pong.best_rally >= game.longest_rally);
+        assert!(records.best_rally >= game.longest_rally);
     }
 }

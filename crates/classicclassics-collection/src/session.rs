@@ -1,218 +1,16 @@
 //! Menu, game selection, records and the shared simulation input.
 
 use crate::audio::Sound;
-use crate::controls::ControlHints;
-use crate::games::{asteroids, lunar, pong};
+use crate::controls::Controls;
+use crate::controls_screen::{CaptureEvent, ControlsScreen};
+use crate::menu;
 use crate::settings::Settings;
 use crate::settings_screen::{self, SettingsScreen};
-use crate::{Result, menu};
 use quasar_render_2d::Canvas;
-use serde::{Deserialize, Serialize};
-use std::path::Path;
+use serde::Serialize;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GameKind {
-    Pong,
-    LunarLander,
-    Asteroids,
-}
-
-impl GameKind {
-    pub const ALL: [Self; 3] = [Self::Pong, Self::LunarLander, Self::Asteroids];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Pong => "PONG",
-            Self::LunarLander => "LUNAR LANDER",
-            Self::Asteroids => "ASTEROIDS",
-        }
-    }
-
-    pub fn number(self) -> &'static str {
-        match self {
-            Self::Pong => "01",
-            Self::LunarLander => "02",
-            Self::Asteroids => "03",
-        }
-    }
-
-    pub fn tagline(self) -> &'static str {
-        match self {
-            Self::Pong => "TWO PADDLES. ONE BALL.",
-            Self::LunarLander => "GRAVITY IS PATIENT.",
-            Self::Asteroids => "EVERY ROCK SPLITS.",
-        }
-    }
-
-    pub fn accent(self) -> [u8; 4] {
-        match self {
-            Self::Pong => crate::paint::CYAN,
-            Self::LunarLander => crate::paint::AMBER,
-            Self::Asteroids => crate::paint::CORAL,
-        }
-    }
-}
-
-/// A single fixed-step input frame. Edges (`*_pressed`, menu and command keys)
-/// are consumed after one tick; held fields stay live for continuous control.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Input {
-    pub menu_up: bool,
-    pub menu_down: bool,
-    pub menu_left: bool,
-    pub menu_right: bool,
-    pub confirm: bool,
-    pub back: bool,
-    pub settings: bool,
-    pub p1: i8,
-    pub p2: i8,
-    pub rotate: i8,
-    pub thrust: bool,
-    pub fire: bool,
-    pub fire_pressed: bool,
-    pub hyperspace: bool,
-    pub pause: bool,
-    pub restart: bool,
-    pub mode: bool,
-    pub mute: bool,
-    pub quit: bool,
-    pub fullscreen: bool,
-    pub filter: bool,
-    pub scale: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "state", rename_all = "snake_case")]
-pub enum Game {
-    Pong(pong::Game),
-    LunarLander(lunar::Game),
-    Asteroids(asteroids::Game),
-}
-
-impl Game {
-    pub fn new(kind: GameKind) -> Self {
-        match kind {
-            GameKind::Pong => Self::Pong(pong::Game::new()),
-            GameKind::LunarLander => Self::LunarLander(lunar::Game::new()),
-            GameKind::Asteroids => Self::Asteroids(asteroids::Game::new()),
-        }
-    }
-
-    pub fn kind(&self) -> GameKind {
-        match self {
-            Self::Pong(_) => GameKind::Pong,
-            Self::LunarLander(_) => GameKind::LunarLander,
-            Self::Asteroids(_) => GameKind::Asteroids,
-        }
-    }
-
-    pub fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
-        match self {
-            Self::Pong(game) => game.tick(input, sounds),
-            Self::LunarLander(game) => game.tick(input, sounds),
-            Self::Asteroids(game) => game.tick(input, sounds),
-        }
-    }
-
-    pub fn autoplay(&self) -> Input {
-        match self {
-            Self::Pong(game) => game.autoplay(),
-            Self::LunarLander(game) => game.autoplay(),
-            Self::Asteroids(game) => game.autoplay(),
-        }
-    }
-
-    pub fn scene(&self, hints: &ControlHints) -> Canvas {
-        match self {
-            Self::Pong(game) => game.scene(hints),
-            Self::LunarLander(game) => game.scene(hints),
-            Self::Asteroids(game) => game.scene(hints),
-        }
-    }
-
-    pub fn record(&mut self, records: &mut Records) {
-        match self {
-            Self::Pong(game) => game.record(records),
-            Self::LunarLander(game) => game.record(records),
-            Self::Asteroids(game) => game.record(records),
-        }
-    }
-
-    pub fn summary(&self) -> String {
-        match self {
-            Self::Pong(game) => game.summary(),
-            Self::LunarLander(game) => game.summary(),
-            Self::Asteroids(game) => game.summary(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct PongRecord {
-    pub best_rally: u32,
-    pub wins: u32,
-    pub matches: u32,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct LunarRecord {
-    pub best_score: u32,
-    pub landings: u32,
-    pub crashes: u32,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct AsteroidsRecord {
-    pub best_score: u32,
-    pub best_level: u32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Records {
-    pub version: u32,
-    pub pong: PongRecord,
-    pub lunar: LunarRecord,
-    pub asteroids: AsteroidsRecord,
-}
-
-impl Default for Records {
-    fn default() -> Self {
-        Self {
-            version: 1,
-            pong: PongRecord::default(),
-            lunar: LunarRecord::default(),
-            asteroids: AsteroidsRecord::default(),
-        }
-    }
-}
-
-impl Records {
-    /// Returns the records plus whether the file is safe to replace on exit.
-    /// Missing files are safe (first run); corrupt or newer files are preserved.
-    pub fn load(path: &Path) -> (Self, bool) {
-        match quasar_storage::read_json::<Self>(path) {
-            Ok(Some(records)) if records.version == 1 => (records, true),
-            Ok(Some(_)) => {
-                eprintln!("Unsupported records version; preserving file and starting fresh");
-                (Self::default(), false)
-            }
-            Ok(None) => (Self::default(), true),
-            Err(error) => {
-                eprintln!("Cannot load records ({error}); preserving file and starting fresh");
-                (Self::default(), false)
-            }
-        }
-    }
-
-    pub fn save(&self, path: &Path) -> Result {
-        quasar_storage::write_json(path, self)?;
-        Ok(())
-    }
-}
+pub use crate::games::{Game, GameKind, Records};
+pub use classicclassics_core::Input;
 
 #[derive(Clone, Debug)]
 pub enum Screen {
@@ -223,6 +21,8 @@ pub enum Screen {
 pub struct Session {
     pub screen: Screen,
     pub settings_screen: Option<SettingsScreen>,
+    pub controls: Controls,
+    pub controls_screen: Option<ControlsScreen>,
     pub selected: usize,
     pub records: Records,
     pub settings: Settings,
@@ -234,6 +34,8 @@ impl Session {
         Self {
             screen: Screen::Menu,
             settings_screen: None,
+            controls: Controls::default(),
+            controls_screen: None,
             selected: 0,
             records,
             settings,
@@ -250,6 +52,25 @@ impl Session {
         self.settings_screen = Some(SettingsScreen::new(from_game));
     }
 
+    pub fn open_controls(&mut self) {
+        if !self.settings_open() {
+            self.open_settings();
+        }
+        self.controls_screen = Some(ControlsScreen::new(&self.controls));
+    }
+
+    pub fn capturing_controls(&self) -> bool {
+        self.controls_screen
+            .as_ref()
+            .is_some_and(ControlsScreen::capturing)
+    }
+
+    pub fn capture_control(&mut self, event: CaptureEvent) {
+        if let Some(screen) = &mut self.controls_screen {
+            screen.capture(event, &mut self.controls);
+        }
+    }
+
     pub fn launch(&mut self, kind: GameKind) {
         self.selected = GameKind::ALL
             .iter()
@@ -262,6 +83,24 @@ impl Session {
     /// Advances one fixed tick. Returns true when the application should quit.
     pub fn tick(&mut self, input: Input) -> bool {
         self.sounds.clear();
+        if let Some(screen) = &mut self.controls_screen {
+            if screen.tick(input, &mut self.controls) {
+                self.controls_screen = None;
+            }
+            return false;
+        }
+        if input.fullscreen {
+            self.settings.fullscreen = !self.settings.fullscreen;
+        }
+        if input.filter {
+            self.settings.linear = !self.settings.linear;
+        }
+        if input.scale {
+            self.settings.integer = !self.settings.integer;
+        }
+        if input.mute {
+            self.settings.muted = !self.settings.muted;
+        }
         if input.quit {
             return true;
         }
@@ -283,6 +122,10 @@ impl Session {
                     return false;
                 }
                 settings_screen::Outcome::Quit => return true,
+                settings_screen::Outcome::Controls => {
+                    self.controls_screen = Some(ControlsScreen::new(&self.controls));
+                    return false;
+                }
             }
         }
         if input.settings {
@@ -296,12 +139,7 @@ impl Session {
                     return true;
                 }
                 let previous = self.selected;
-                if input.menu_left || input.menu_up {
-                    self.selected = (self.selected + GameKind::ALL.len() - 1) % GameKind::ALL.len();
-                }
-                if input.menu_right || input.menu_down {
-                    self.selected = (self.selected + 1) % GameKind::ALL.len();
-                }
+                self.selected = menu::navigate(self.selected, input, GameKind::ALL.len());
                 if previous != self.selected {
                     self.sounds.push(Sound::MenuMove);
                 }
@@ -326,13 +164,24 @@ impl Session {
         }
     }
 
-    pub fn scene(&self, hints: &ControlHints) -> Canvas {
+    pub fn canvas_size(&self) -> (u32, u32) {
+        match self.screen {
+            Screen::Menu => (menu::WIDTH, menu::HEIGHT),
+            Screen::Game(_) => (crate::WIDTH, crate::HEIGHT),
+        }
+    }
+
+    pub fn scene(&mut self) -> Canvas {
+        let hints = self.controls.hints();
         let base = match &self.screen {
-            Screen::Menu => menu::scene(self.selected, &self.records, hints),
-            Screen::Game(game) => game.scene(hints),
+            Screen::Menu => menu::scene(self.selected, &self.records, &hints),
+            Screen::Game(game) => game.scene(&hints),
         };
+        if let Some(screen) = &mut self.controls_screen {
+            return screen.scene(base);
+        }
         match &self.settings_screen {
-            Some(screen) => screen.scene(&self.settings, hints, base),
+            Some(screen) => screen.scene(&self.settings, &hints, base),
             None => base,
         }
     }
@@ -348,6 +197,9 @@ impl Session {
     }
 
     pub fn summary(&self) -> String {
+        if self.controls_screen.is_some() {
+            return format!("screen=controls capturing={}", self.capturing_controls());
+        }
         if self.settings_screen.is_some() {
             return format!(
                 "screen=settings from_game={} fullscreen={} volume={:.2}",
@@ -370,6 +222,7 @@ impl Session {
             version: u32,
             screen: &'static str,
             settings_open: bool,
+            controls_open: bool,
             selected: usize,
             records: &'a Records,
             settings: &'a Settings,
@@ -386,6 +239,7 @@ impl Session {
                 }
             },
             settings_open: self.settings_screen.is_some(),
+            controls_open: self.controls_screen.is_some(),
             selected: self.selected,
             records: &self.records,
             settings: &self.settings,
@@ -467,7 +321,7 @@ mod tests {
         });
         let rows = crate::settings_screen::SettingsScreen::new(true);
         let mut overlay = rows;
-        overlay.selection = 7;
+        overlay.selection = 8;
         session.settings_screen = Some(overlay);
         assert!(!session.tick(Input {
             confirm: true,

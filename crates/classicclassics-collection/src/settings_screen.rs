@@ -13,15 +13,16 @@ const PANEL_X: f32 = 186.0;
 const PANEL_Y: f32 = 56.0;
 const PANEL_WIDTH: f32 = 588.0;
 const PANEL_HEIGHT: f32 = 446.0;
-const ROW_HEIGHT: f32 = 31.0;
+const ROW_HEIGHT: f32 = 28.0;
 const ROWS_TOP: f32 = 150.0;
 
-const WINDOW_PRESETS: [(u32, u32); 5] = [
+const WINDOW_PRESETS: [(u32, u32); 6] = [
     (800, 500),
     (960, 600),
     (1280, 800),
     (1440, 900),
     (1600, 1000),
+    (1920, 1080),
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +34,7 @@ enum Row {
     Scaling,
     Volume,
     Mute,
+    Controls,
     Catalog,
     Reset,
     Quit,
@@ -47,6 +49,7 @@ fn rows(from_game: bool) -> Vec<Row> {
         Row::Scaling,
         Row::Volume,
         Row::Mute,
+        Row::Controls,
     ];
     if from_game {
         rows.push(Row::Catalog);
@@ -61,6 +64,7 @@ pub enum Outcome {
     Stay,
     Close,
     LeaveToCatalog,
+    Controls,
     Quit,
 }
 
@@ -118,16 +122,21 @@ impl SettingsScreen {
             }
             Row::Window => {
                 if direction != 0 {
-                    let current = WINDOW_PRESETS
-                        .iter()
-                        .position(|preset| {
-                            preset.0 == settings.width && preset.1 == settings.height
-                        })
-                        .unwrap_or(1);
+                    let current = if settings.auto_resolution {
+                        0
+                    } else {
+                        WINDOW_PRESETS
+                            .iter()
+                            .position(|preset| *preset == (settings.width, settings.height))
+                            .map_or(0, |index| index + 1)
+                    };
                     let next = (current as isize + direction as isize)
-                        .rem_euclid(WINDOW_PRESETS.len() as isize)
+                        .rem_euclid((WINDOW_PRESETS.len() + 1) as isize)
                         as usize;
-                    (settings.width, settings.height) = WINDOW_PRESETS[next];
+                    settings.auto_resolution = next == 0;
+                    if next > 0 {
+                        (settings.width, settings.height) = WINDOW_PRESETS[next - 1];
+                    }
                     changed = true;
                 }
             }
@@ -153,6 +162,11 @@ impl SettingsScreen {
                 if direction != 0 || input.confirm {
                     settings.muted = !settings.muted;
                     changed = true;
+                }
+            }
+            Row::Controls => {
+                if input.confirm {
+                    return Outcome::Controls;
                 }
             }
             Row::Catalog => {
@@ -186,7 +200,14 @@ impl SettingsScreen {
 
     pub fn scene(&self, settings: &Settings, hints: &ControlHints, base: Canvas) -> Canvas {
         let mut paint = Paint::over(base);
-        paint.rect(0.0, 0.0, WIDTH as f32, HEIGHT as f32, [3, 5, 10, 255]);
+        paint.rect(
+            0.0,
+            0.0,
+            paint.canvas().width() as f32,
+            paint.canvas().height() as f32,
+            [3, 5, 10, 255],
+        );
+        paint.fit_view(WIDTH, HEIGHT);
         paint.rect(
             PANEL_X,
             PANEL_Y,
@@ -277,7 +298,10 @@ impl SettingsScreen {
                     1.0,
                     if selected { AMBER } else { [43, 59, 72, 255] },
                 );
-            } else if matches!(row, Row::Resume | Row::Catalog | Row::Reset | Row::Quit) {
+            } else if matches!(
+                row,
+                Row::Resume | Row::Controls | Row::Catalog | Row::Reset | Row::Quit
+            ) {
                 paint.text(
                     PANEL_X + PANEL_WIDTH - 54.0,
                     y,
@@ -339,11 +363,12 @@ impl Row {
         match self {
             Self::Resume => "RESUME",
             Self::Fullscreen => "FULLSCREEN",
-            Self::Window => "WINDOW SIZE",
+            Self::Window => "RESOLUTION",
             Self::Filtering => "FILTERING",
             Self::Scaling => "SCALING",
             Self::Volume => "MASTER VOLUME",
             Self::Mute => "MUTE",
+            Self::Controls => "CONTROLS",
             Self::Catalog => "BACK TO CATALOG",
             Self::Reset => "RESTORE DEFAULTS",
             Self::Quit => "QUIT CLASSIC CLASSICS",
@@ -353,7 +378,11 @@ impl Row {
     fn value(self, settings: &Settings) -> Option<String> {
         match self {
             Self::Fullscreen => Some(if settings.fullscreen { "ON" } else { "OFF" }.into()),
-            Self::Window => Some(format!("{} x {}", settings.width, settings.height)),
+            Self::Window => Some(if settings.auto_resolution {
+                format!("AUTO ({} x {})", settings.width, settings.height)
+            } else {
+                format!("{} x {}", settings.width, settings.height)
+            }),
             Self::Filtering => Some(if settings.linear { "SMOOTH" } else { "SHARP" }.into()),
             Self::Scaling => Some(if settings.integer { "INTEGER" } else { "FIT" }.into()),
             Self::Volume => Some(format!("{:03}%", (settings.volume * 100.0).round())),
@@ -415,7 +444,7 @@ mod tests {
     fn display_and_audio_rows_change_settings() {
         let (mut screen, mut settings, mut sounds) = screen(false);
         activate(&mut screen, &mut settings, &mut sounds, Row::Fullscreen);
-        assert!(settings.fullscreen);
+        assert!(!settings.fullscreen);
         activate(&mut screen, &mut settings, &mut sounds, Row::Filtering);
         assert!(settings.linear);
         activate(&mut screen, &mut settings, &mut sounds, Row::Scaling);
@@ -445,16 +474,17 @@ mod tests {
             &mut settings,
             &mut sounds,
         );
-        assert_eq!((settings.width, settings.height), (800, 500));
+        assert_eq!((settings.width, settings.height), (1920, 1080));
+        assert!(!settings.auto_resolution);
     }
 
     #[test]
     fn reset_restore_catalog_quit_and_close_are_explicit() {
         let (mut screen, mut settings, mut sounds) = screen(true);
-        settings.fullscreen = true;
+        settings.fullscreen = false;
         settings.linear = true;
         activate(&mut screen, &mut settings, &mut sounds, Row::Reset);
-        assert!(!settings.fullscreen);
+        assert!(settings.fullscreen && settings.auto_resolution);
         assert!(!settings.linear);
 
         let list = rows(true);

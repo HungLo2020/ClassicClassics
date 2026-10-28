@@ -28,58 +28,38 @@ pub const FULLSCREEN: &str = "fullscreen";
 pub const FILTER: &str = "filter";
 pub const SCALE: &str = "scale";
 
-pub const ACTIONS: [&str; 21] = [
-    MENU_UP, MENU_DOWN, MENU_LEFT, MENU_RIGHT, CONFIRM, BACK, SETTINGS, P1, P2, ROTATE, THRUST,
-    FIRE, HYPERSPACE, PAUSE, RESTART, MODE, MUTE, QUIT, FULLSCREEN, FILTER, SCALE,
+pub const MENU_HORIZONTAL: &str = "menu_horizontal";
+pub const MENU_VERTICAL: &str = "menu_vertical";
+
+pub const ACTIONS: [&str; 23] = [
+    MENU_UP,
+    MENU_DOWN,
+    MENU_LEFT,
+    MENU_RIGHT,
+    CONFIRM,
+    BACK,
+    SETTINGS,
+    P1,
+    P2,
+    ROTATE,
+    THRUST,
+    FIRE,
+    HYPERSPACE,
+    PAUSE,
+    RESTART,
+    MODE,
+    MUTE,
+    QUIT,
+    FULLSCREEN,
+    FILTER,
+    SCALE,
+    MENU_HORIZONTAL,
+    MENU_VERTICAL,
 ];
 
-/// Presentation labels derived from the first binding of each action.
-#[derive(Clone, Debug)]
-pub struct ControlHints {
-    pub confirm: String,
-    pub back: String,
-    pub settings: String,
-    pub menu_left: String,
-    pub p1: String,
-    pub p2: String,
-    pub rotate: String,
-    pub thrust: String,
-    pub fire: String,
-    pub hyperspace: String,
-    pub pause: String,
-    pub restart: String,
-    pub mode: String,
-    pub mute: String,
-    pub fullscreen: String,
-    pub filter: String,
-    pub scale: String,
-}
+pub use classicclassics_core::ControlHints;
 
-impl Default for ControlHints {
-    fn default() -> Self {
-        Self {
-            confirm: "ENTER".into(),
-            back: "BACKSPACE".into(),
-            settings: "ESC".into(),
-            menu_left: "A/LEFT".into(),
-            p1: "W/S".into(),
-            p2: "UP/DOWN".into(),
-            rotate: "A/D".into(),
-            thrust: "W".into(),
-            fire: "SPACE".into(),
-            hyperspace: "SHIFT".into(),
-            pause: "P".into(),
-            restart: "R".into(),
-            mode: "TAB".into(),
-            mute: "M".into(),
-            fullscreen: "F11".into(),
-            filter: "F2".into(),
-            scale: "F3".into(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Controls {
     pub version: u32,
@@ -114,15 +94,9 @@ impl Default for Controls {
             .bind(SETTINGS, Binding::key(Key::Escape))
             .bind(SETTINGS, Binding::gamepad_button(GamepadButton::East))
             .bind(P1, Binding::axis(Key::KeyW, Key::KeyS))
-            .bind(
-                P1,
-                Binding::gamepad_axis_scaled(GamepadAxis::LeftStickY, -1.0),
-            )
+            .bind(P1, Binding::gamepad_axis(GamepadAxis::LeftStickY))
             .bind(P2, Binding::axis(Key::ArrowUp, Key::ArrowDown))
-            .bind(
-                P2,
-                Binding::gamepad_axis_scaled(GamepadAxis::RightStickY, -1.0),
-            )
+            .bind(P2, Binding::gamepad_axis(GamepadAxis::RightStickY))
             .bind(ROTATE, Binding::axis(Key::KeyA, Key::KeyD))
             .bind(ROTATE, Binding::axis(Key::ArrowLeft, Key::ArrowRight))
             .bind(ROTATE, Binding::gamepad_axis(GamepadAxis::LeftStickX))
@@ -148,7 +122,15 @@ impl Default for Controls {
             .bind(FULLSCREEN, Binding::chord([Key::AltLeft, Key::Enter]))
             .bind(FULLSCREEN, Binding::chord([Key::AltRight, Key::Enter]))
             .bind(FILTER, Binding::key(Key::F2))
-            .bind(SCALE, Binding::key(Key::F3));
+            .bind(SCALE, Binding::key(Key::F3))
+            .bind(
+                MENU_HORIZONTAL,
+                Binding::gamepad_axis(GamepadAxis::LeftStickX),
+            )
+            .bind(
+                MENU_VERTICAL,
+                Binding::gamepad_axis(GamepadAxis::LeftStickY),
+            );
         Self {
             version: 1,
             bindings,
@@ -179,10 +161,81 @@ impl Controls {
     }
 
     pub fn load(path: &Path) -> Result<Self> {
-        let controls: Self =
-            quasar_storage::read_json(path)?.ok_or("controls file does not exist")?;
+        let mut controls: Self = quasar_config::load_file_typed(path)?;
+        // Older version-one presets predate configurable catalog stick axes.
+        let defaults = Self::default();
+        for name in [MENU_HORIZONTAL, MENU_VERTICAL] {
+            controls
+                .bindings
+                .actions
+                .entry(name.into())
+                .or_insert_with(|| defaults.bindings.actions[name].clone());
+        }
         controls.validate()?;
         Ok(controls)
+    }
+
+    pub fn load_saved(path: &Path) -> (Self, bool) {
+        let load = || -> Result<(Self, bool)> {
+            let Some(source) = crate::config_file::source(path)? else {
+                return Ok((Self::default(), true));
+            };
+            Ok((Self::load(&source)?, true))
+        };
+        match load() {
+            Ok(result) => result,
+            Err(error) => {
+                eprintln!("Cannot load controls ({error}); preserving file and using defaults");
+                (Self::default(), false)
+            }
+        }
+    }
+
+    pub fn save(&self, path: &Path) -> Result {
+        self.validate()?;
+        crate::config_file::write(path, self)
+    }
+
+    /// Edit one alternative while retaining all other keys, buttons and axes.
+    pub fn set_binding(&mut self, action: &str, slot: usize, binding: Binding) -> Result {
+        let mut next = self.clone();
+        let values = next
+            .bindings
+            .actions
+            .get_mut(action)
+            .ok_or("unknown action")?;
+        if slot > values.len() {
+            return Err("invalid binding slot".into());
+        }
+        if values
+            .iter()
+            .enumerate()
+            .any(|(index, existing)| index != slot && *existing == binding)
+        {
+            return Err("that binding is already assigned to this action".into());
+        }
+        if slot == values.len() {
+            values.push(binding);
+        } else {
+            values[slot] = binding;
+        }
+        next.validate()?;
+        *self = next;
+        Ok(())
+    }
+
+    pub fn remove_binding(&mut self, action: &str, slot: usize) {
+        if let Some(values) = self.bindings.actions.get_mut(action)
+            && slot < values.len()
+        {
+            values.remove(slot);
+        }
+    }
+
+    pub fn restore_action(&mut self, action: &str) {
+        if let Some(values) = Self::default().bindings.actions.get(action) {
+            self.bindings.actions.insert(action.into(), values.clone());
+        }
     }
 
     pub fn hints(&self) -> ControlHints {
@@ -216,7 +269,7 @@ impl Controls {
     }
 }
 
-fn binding_label(binding: &Binding) -> String {
+pub fn binding_label(binding: &Binding) -> String {
     match binding {
         Binding::Button { button } => button_label(*button),
         Binding::Axis { negative, positive } => {
@@ -308,6 +361,48 @@ mod tests {
         let controls = Controls::default();
         controls.validate().unwrap();
         assert_eq!(controls.bindings.actions.len(), ACTIONS.len());
+    }
+
+    #[test]
+    fn toml_preserves_bindings_and_migrates_json_without_overwriting_it() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("controls.toml");
+        let legacy = path.with_extension("json");
+        let mut controls = Controls::default();
+        controls
+            .bindings
+            .actions
+            .insert(FIRE.into(), vec![Binding::key(Key::KeyF)]);
+        controls.save(&legacy).unwrap();
+        let old = std::fs::read(&legacy).unwrap();
+        let (loaded, migrate) = Controls::load_saved(&path);
+        assert!(migrate);
+        assert_eq!(loaded.bindings, controls.bindings);
+        loaded.save(&path).unwrap();
+        assert_eq!(Controls::load(&path).unwrap().bindings, controls.bindings);
+        assert!(Controls::load_saved(&path).1);
+        assert_eq!(std::fs::read(&legacy).unwrap(), old);
+        std::fs::write(&path, "version = 99").unwrap();
+        assert!(!Controls::load_saved(&path).1);
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "version = 99");
+    }
+
+    #[test]
+    fn old_presets_gain_menu_axes_but_explicitly_disabled_axes_stay_disabled() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("controls.toml");
+        let mut old = Controls::default();
+        old.bindings.actions.remove(MENU_HORIZONTAL);
+        old.bindings
+            .actions
+            .insert(MENU_VERTICAL.into(), Vec::new());
+        crate::config_file::write(&path, &old).unwrap();
+        let migrated = Controls::load(&path).unwrap();
+        assert_eq!(
+            migrated.bindings.actions[MENU_HORIZONTAL],
+            Controls::default().bindings.actions[MENU_HORIZONTAL]
+        );
+        assert!(migrated.bindings.actions[MENU_VERTICAL].is_empty());
     }
 
     #[test]

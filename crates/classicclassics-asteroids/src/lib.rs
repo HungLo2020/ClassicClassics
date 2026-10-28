@@ -1,11 +1,12 @@
 //! Asteroids: inertia, wrap-around space, splitting rocks and a vector ship.
 
-use crate::audio::Sound;
-use crate::controls::ControlHints;
-use crate::games::{Particle, Rng, update_particles, wrap};
-use crate::paint::{AMBER, CORAL, CYAN, DIM, GREEN, GRID, MUTED, Paint, WHITE, world};
-use crate::session::{Input, Records};
-use crate::{HEIGHT, TICK_HZ, WIDTH};
+use classicclassics_core::ControlHints;
+use classicclassics_core::paint::{
+    AMBER, CORAL, CYAN, DIM, GREEN, GRID, MUTED, Paint, WHITE, world,
+};
+use classicclassics_core::simulation::{Particle, Rng, update_particles, wrap};
+use classicclassics_core::{ArcadeGame, GameInfo, Input, Sound};
+use classicclassics_core::{HEIGHT, TICK_HZ, WIDTH};
 use quasar_render_2d::Canvas;
 use serde::{Deserialize, Serialize};
 
@@ -161,7 +162,219 @@ impl Game {
         }
     }
 
-    pub fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
+    fn collide_bullets(&mut self, sounds: &mut Vec<Sound>) {
+        let mut bullet_index = 0;
+        while bullet_index < self.bullets.len() {
+            let bullet = self.bullets[bullet_index].clone();
+            let mut hit = None;
+            for (index, asteroid) in self.asteroids.iter().enumerate() {
+                let dx = wrapped_delta(bullet.x, asteroid.x, WIDTH as f32);
+                let dy = wrapped_delta(bullet.y, asteroid.y, HEIGHT as f32);
+                if dx.hypot(dy) <= asteroid.radius * 0.9 {
+                    hit = Some(index);
+                    break;
+                }
+            }
+            if let Some(index) = hit {
+                self.bullets.remove(bullet_index);
+                let asteroid = self.asteroids.remove(index);
+                self.score = self.score.saturating_add(match asteroid.size {
+                    3 => 100,
+                    2 => 50,
+                    _ => 20,
+                });
+                self.break_apart(&asteroid, sounds);
+            } else {
+                bullet_index += 1;
+            }
+        }
+    }
+
+    fn break_apart(&mut self, asteroid: &Asteroid, sounds: &mut Vec<Sound>) {
+        sounds.push(Sound::Explosion);
+        for index in 0..10 {
+            let angle = index as f32 / 10.0 * std::f32::consts::TAU;
+            let speed = 30.0 + (index % 4) as f32 * 18.0;
+            self.particles.push(Particle::new(
+                [asteroid.x, asteroid.y],
+                [angle.cos() * speed, angle.sin() * speed],
+                0.55,
+                if index % 2 == 0 { 0 } else { 1 },
+            ));
+        }
+        if asteroid.size <= 1 {
+            return;
+        }
+        let child = asteroid.size - 1;
+        let base = asteroid.vx.hypot(asteroid.vy).max(28.0) + 18.0;
+        let direction = asteroid.vy.atan2(asteroid.vx);
+        for offset in [-0.55f32, 0.55] {
+            let angle = direction + offset;
+            let velocity = [
+                angle.cos() * base + self.rng.range(-8.0, 8.0),
+                angle.sin() * base + self.rng.range(-8.0, 8.0),
+            ];
+            let position = [
+                wrap(asteroid.x + offset.cos() * 12.0, WIDTH as f32),
+                wrap(asteroid.y + offset.sin() * 12.0, HEIGHT as f32),
+            ];
+            let child = self.make_asteroid(child, position, velocity);
+            self.asteroids.push(child);
+        }
+    }
+
+    fn collide_ship(&mut self, sounds: &mut Vec<Sound>) {
+        if self.invulnerable > 0.0 {
+            return;
+        }
+        let hit = self.asteroids.iter().any(|asteroid| {
+            let dx = wrapped_delta(self.ship[0], asteroid.x, WIDTH as f32);
+            let dy = wrapped_delta(self.ship[1], asteroid.y, HEIGHT as f32);
+            dx.hypot(dy) < asteroid.radius * 0.82 + SHIP_RADIUS * 0.6
+        });
+        if !hit {
+            return;
+        }
+        self.lives = self.lives.saturating_sub(1);
+        self.explode_ship(sounds);
+        if self.lives == 0 {
+            self.phase = Phase::GameOver;
+            sounds.push(Sound::GameOver);
+        } else {
+            self.ship = [WIDTH as f32 * 0.5, HEIGHT as f32 * 0.5];
+            self.velocity = [0.0, 0.0];
+            self.angle = 0.0;
+            self.invulnerable = 2.6;
+            self.bullets.clear();
+        }
+    }
+
+    fn explode_ship(&mut self, sounds: &mut Vec<Sound>) {
+        sounds.push(Sound::Explosion);
+        for index in 0..28 {
+            let angle = index as f32 / 28.0 * std::f32::consts::TAU;
+            let speed = 40.0 + (index % 5) as f32 * 20.0;
+            self.particles.push(Particle::new(
+                self.ship,
+                [angle.cos() * speed, angle.sin() * speed],
+                0.95,
+                if index % 3 == 0 { 0 } else { 1 },
+            ));
+        }
+    }
+
+    fn draw_asteroid(&self, paint: &mut Paint, asteroid: &Asteroid) {
+        for offset_x in [-(WIDTH as f32), 0.0, WIDTH as f32] {
+            for offset_y in [-(HEIGHT as f32), 0.0, HEIGHT as f32] {
+                let x = asteroid.x + offset_x;
+                let y = asteroid.y + offset_y;
+                if x < -asteroid.radius * 2.0
+                    || x > WIDTH as f32 + asteroid.radius * 2.0
+                    || y < -asteroid.radius * 2.0
+                    || y > HEIGHT as f32 + asteroid.radius * 2.0
+                {
+                    continue;
+                }
+                let points: Vec<[f32; 2]> = asteroid
+                    .shape
+                    .iter()
+                    .map(|point| {
+                        let rotated = classicclassics_core::paint::rotate(*point, asteroid.angle);
+                        [
+                            rotated[0] * asteroid.radius + x,
+                            rotated[1] * asteroid.radius + y,
+                        ]
+                    })
+                    .collect();
+                let halo = if asteroid.size >= 3 {
+                    [64, 39, 33, 255]
+                } else {
+                    [49, 34, 31, 255]
+                };
+                paint.glow_polyline(&points, 1.3, halo, [174, 121, 103, 255], true);
+            }
+        }
+    }
+
+    fn draw_ship(&self, paint: &mut Paint) {
+        for offset_x in [-(WIDTH as f32), 0.0, WIDTH as f32] {
+            for offset_y in [-(HEIGHT as f32), 0.0, HEIGHT as f32] {
+                let x = self.ship[0] + offset_x;
+                let y = self.ship[1] + offset_y;
+                if x < -40.0 || x > WIDTH as f32 + 40.0 || y < -40.0 || y > HEIGHT as f32 + 40.0 {
+                    continue;
+                }
+                let position = [x, y];
+                let body = [
+                    world(position, self.angle, [0.0, -17.0]),
+                    world(position, self.angle, [11.0, 12.0]),
+                    world(position, self.angle, [0.0, 6.0]),
+                    world(position, self.angle, [-11.0, 12.0]),
+                ];
+                paint.glow_polyline(&body, 1.5, [40, 67, 55, 255], CYAN, true);
+                if self.thrusting {
+                    paint.line(
+                        world(position, self.angle, [-5.0, 10.0]),
+                        world(position, self.angle, [0.0, 25.0]),
+                        1.5,
+                        AMBER,
+                    );
+                    paint.line(
+                        world(position, self.angle, [5.0, 10.0]),
+                        world(position, self.angle, [0.0, 25.0]),
+                        1.5,
+                        AMBER,
+                    );
+                    paint.line(
+                        world(position, self.angle, [0.0, 10.0]),
+                        world(position, self.angle, [0.0, 31.0]),
+                        1.0,
+                        [255, 226, 158, 255],
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn normalize_angle(angle: f32) -> f32 {
+    let mut angle = angle;
+    while angle > std::f32::consts::PI {
+        angle -= std::f32::consts::TAU;
+    }
+    while angle < -std::f32::consts::PI {
+        angle += std::f32::consts::TAU;
+    }
+    angle
+}
+
+fn wrapped_delta(a: f32, b: f32, size: f32) -> f32 {
+    let mut delta = a - b;
+    if delta > size * 0.5 {
+        delta -= size;
+    } else if delta < -size * 0.5 {
+        delta += size;
+    }
+    delta
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Record {
+    pub best_score: u32,
+    pub best_level: u32,
+}
+
+impl ArcadeGame for Game {
+    type Record = Record;
+    const INFO: GameInfo = GameInfo {
+        name: "ASTEROIDS",
+        aliases: &["asteroids"],
+        tagline: "EVERY ROCK SPLITS.",
+        accent: classicclassics_core::paint::CORAL,
+    };
+
+    fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         self.ticks += 1;
         if input.restart {
             *self = Self::new();
@@ -272,113 +485,12 @@ impl Game {
         }
     }
 
-    fn collide_bullets(&mut self, sounds: &mut Vec<Sound>) {
-        let mut bullet_index = 0;
-        while bullet_index < self.bullets.len() {
-            let bullet = self.bullets[bullet_index].clone();
-            let mut hit = None;
-            for (index, asteroid) in self.asteroids.iter().enumerate() {
-                let dx = wrapped_delta(bullet.x, asteroid.x, WIDTH as f32);
-                let dy = wrapped_delta(bullet.y, asteroid.y, HEIGHT as f32);
-                if dx.hypot(dy) <= asteroid.radius * 0.9 {
-                    hit = Some(index);
-                    break;
-                }
-            }
-            if let Some(index) = hit {
-                self.bullets.remove(bullet_index);
-                let asteroid = self.asteroids.remove(index);
-                self.score = self.score.saturating_add(match asteroid.size {
-                    3 => 100,
-                    2 => 50,
-                    _ => 20,
-                });
-                self.break_apart(&asteroid, sounds);
-            } else {
-                bullet_index += 1;
-            }
-        }
+    fn record(&mut self, records: &mut Record) {
+        records.best_score = records.best_score.max(self.score);
+        records.best_level = records.best_level.max(self.level);
     }
 
-    fn break_apart(&mut self, asteroid: &Asteroid, sounds: &mut Vec<Sound>) {
-        sounds.push(Sound::Explosion);
-        for index in 0..10 {
-            let angle = index as f32 / 10.0 * std::f32::consts::TAU;
-            let speed = 30.0 + (index % 4) as f32 * 18.0;
-            self.particles.push(Particle::new(
-                [asteroid.x, asteroid.y],
-                [angle.cos() * speed, angle.sin() * speed],
-                0.55,
-                if index % 2 == 0 { 0 } else { 1 },
-            ));
-        }
-        if asteroid.size <= 1 {
-            return;
-        }
-        let child = asteroid.size - 1;
-        let base = asteroid.vx.hypot(asteroid.vy).max(28.0) + 18.0;
-        let direction = asteroid.vy.atan2(asteroid.vx);
-        for offset in [-0.55f32, 0.55] {
-            let angle = direction + offset;
-            let velocity = [
-                angle.cos() * base + self.rng.range(-8.0, 8.0),
-                angle.sin() * base + self.rng.range(-8.0, 8.0),
-            ];
-            let position = [
-                wrap(asteroid.x + offset.cos() * 12.0, WIDTH as f32),
-                wrap(asteroid.y + offset.sin() * 12.0, HEIGHT as f32),
-            ];
-            let child = self.make_asteroid(child, position, velocity);
-            self.asteroids.push(child);
-        }
-    }
-
-    fn collide_ship(&mut self, sounds: &mut Vec<Sound>) {
-        if self.invulnerable > 0.0 {
-            return;
-        }
-        let hit = self.asteroids.iter().any(|asteroid| {
-            let dx = wrapped_delta(self.ship[0], asteroid.x, WIDTH as f32);
-            let dy = wrapped_delta(self.ship[1], asteroid.y, HEIGHT as f32);
-            dx.hypot(dy) < asteroid.radius * 0.82 + SHIP_RADIUS * 0.6
-        });
-        if !hit {
-            return;
-        }
-        self.lives = self.lives.saturating_sub(1);
-        self.explode_ship(sounds);
-        if self.lives == 0 {
-            self.phase = Phase::GameOver;
-            sounds.push(Sound::GameOver);
-        } else {
-            self.ship = [WIDTH as f32 * 0.5, HEIGHT as f32 * 0.5];
-            self.velocity = [0.0, 0.0];
-            self.angle = 0.0;
-            self.invulnerable = 2.6;
-            self.bullets.clear();
-        }
-    }
-
-    fn explode_ship(&mut self, sounds: &mut Vec<Sound>) {
-        sounds.push(Sound::Explosion);
-        for index in 0..28 {
-            let angle = index as f32 / 28.0 * std::f32::consts::TAU;
-            let speed = 40.0 + (index % 5) as f32 * 20.0;
-            self.particles.push(Particle::new(
-                self.ship,
-                [angle.cos() * speed, angle.sin() * speed],
-                0.95,
-                if index % 3 == 0 { 0 } else { 1 },
-            ));
-        }
-    }
-
-    pub fn record(&self, records: &mut Records) {
-        records.asteroids.best_score = records.asteroids.best_score.max(self.score);
-        records.asteroids.best_level = records.asteroids.best_level.max(self.level);
-    }
-
-    pub fn autoplay(&self) -> Input {
+    fn autoplay(&self) -> Input {
         if self.phase == Phase::GameOver {
             return Input {
                 fire_pressed: true,
@@ -421,7 +533,7 @@ impl Game {
         }
     }
 
-    pub fn summary(&self) -> String {
+    fn summary(&self) -> String {
         format!(
             "phase={:?} level={} score={} lives={} asteroids={} bullets={}",
             self.phase,
@@ -433,7 +545,7 @@ impl Game {
         )
     }
 
-    pub fn scene(&self, hints: &ControlHints) -> Canvas {
+    fn scene(&self, hints: &ControlHints) -> Canvas {
         let mut paint = Paint::new(WIDTH, HEIGHT);
         paint.background();
         paint.starfield(0xA57E2019, 180, [43, 50, 62, 255]);
@@ -568,99 +680,53 @@ impl Game {
         paint.into_canvas()
     }
 
-    fn draw_asteroid(&self, paint: &mut Paint, asteroid: &Asteroid) {
-        for offset_x in [-(WIDTH as f32), 0.0, WIDTH as f32] {
-            for offset_y in [-(HEIGHT as f32), 0.0, HEIGHT as f32] {
-                let x = asteroid.x + offset_x;
-                let y = asteroid.y + offset_y;
-                if x < -asteroid.radius * 2.0
-                    || x > WIDTH as f32 + asteroid.radius * 2.0
-                    || y < -asteroid.radius * 2.0
-                    || y > HEIGHT as f32 + asteroid.radius * 2.0
-                {
-                    continue;
-                }
-                let points: Vec<[f32; 2]> = asteroid
-                    .shape
-                    .iter()
-                    .map(|point| {
-                        let rotated = crate::paint::rotate(*point, asteroid.angle);
-                        [
-                            rotated[0] * asteroid.radius + x,
-                            rotated[1] * asteroid.radius + y,
-                        ]
-                    })
-                    .collect();
-                let halo = if asteroid.size >= 3 {
-                    [64, 39, 33, 255]
-                } else {
-                    [49, 34, 31, 255]
-                };
-                paint.glow_polyline(&points, 1.3, halo, [174, 121, 103, 255], true);
-            }
+    fn catalog_record(record: &Record) -> (&'static str, String) {
+        ("BEST SCORE", record.best_score.to_string())
+    }
+
+    fn motif(paint: &mut Paint, cx: f32, cy: f32, accent: [u8; 4]) {
+        use classicclassics_core::paint::{WHITE, world};
+        let rocks = [
+            (cx - 55.0, cy - 24.0, 20.0, 0.4),
+            (cx + 45.0, cy + 18.0, 29.0, 2.1),
+            (cx + 14.0, cy - 44.0, 12.0, 1.2),
+        ];
+        for (x, y, radius, angle) in rocks {
+            let points: Vec<[f32; 2]> = (0..9)
+                .map(|index| {
+                    let a = index as f32 / 9.0 * std::f32::consts::TAU;
+                    let wobble = 0.72 + ((index * 37) % 11) as f32 * 0.035;
+                    [
+                        x + (a + angle).cos() * radius * wobble,
+                        y + (a + angle).sin() * radius * wobble,
+                    ]
+                })
+                .collect();
+            paint.glow_polyline(&points, 1.2, [65, 38, 32, 255], [166, 111, 94, 255], true);
         }
+        let ship = [cx - 8.0, cy + 28.0];
+        let body = [
+            world(ship, -1.57, [0.0, -15.0]),
+            world(ship, -1.57, [10.0, 10.0]),
+            world(ship, -1.57, [0.0, 5.0]),
+            world(ship, -1.57, [-10.0, 10.0]),
+        ];
+        paint.glow_polyline(&body, 1.4, [42, 64, 48, 255], accent, true);
+        paint.line(
+            world(ship, -1.57, [0.0, 5.0]),
+            world(ship, -1.57, [-4.0, 18.0]),
+            1.0,
+            [255, 210, 120, 255],
+        );
+        paint.line(
+            world(ship, -1.57, [0.0, 5.0]),
+            world(ship, -1.57, [4.0, 18.0]),
+            1.0,
+            [255, 210, 120, 255],
+        );
+        paint.rect(cx - 30.0, cy - 8.0, 3.0, 3.0, WHITE);
+        paint.rect(cx - 56.0, cy - 12.0, 2.0, 2.0, WHITE);
     }
-
-    fn draw_ship(&self, paint: &mut Paint) {
-        for offset_x in [-(WIDTH as f32), 0.0, WIDTH as f32] {
-            for offset_y in [-(HEIGHT as f32), 0.0, HEIGHT as f32] {
-                let x = self.ship[0] + offset_x;
-                let y = self.ship[1] + offset_y;
-                if x < -40.0 || x > WIDTH as f32 + 40.0 || y < -40.0 || y > HEIGHT as f32 + 40.0 {
-                    continue;
-                }
-                let position = [x, y];
-                let body = [
-                    world(position, self.angle, [0.0, -17.0]),
-                    world(position, self.angle, [11.0, 12.0]),
-                    world(position, self.angle, [0.0, 6.0]),
-                    world(position, self.angle, [-11.0, 12.0]),
-                ];
-                paint.glow_polyline(&body, 1.5, [40, 67, 55, 255], CYAN, true);
-                if self.thrusting {
-                    paint.line(
-                        world(position, self.angle, [-5.0, 10.0]),
-                        world(position, self.angle, [0.0, 25.0]),
-                        1.5,
-                        AMBER,
-                    );
-                    paint.line(
-                        world(position, self.angle, [5.0, 10.0]),
-                        world(position, self.angle, [0.0, 25.0]),
-                        1.5,
-                        AMBER,
-                    );
-                    paint.line(
-                        world(position, self.angle, [0.0, 10.0]),
-                        world(position, self.angle, [0.0, 31.0]),
-                        1.0,
-                        [255, 226, 158, 255],
-                    );
-                }
-            }
-        }
-    }
-}
-
-fn normalize_angle(angle: f32) -> f32 {
-    let mut angle = angle;
-    while angle > std::f32::consts::PI {
-        angle -= std::f32::consts::TAU;
-    }
-    while angle < -std::f32::consts::PI {
-        angle += std::f32::consts::TAU;
-    }
-    angle
-}
-
-fn wrapped_delta(a: f32, b: f32, size: f32) -> f32 {
-    let mut delta = a - b;
-    if delta > size * 0.5 {
-        delta -= size;
-    } else if delta < -size * 0.5 {
-        delta += size;
-    }
-    delta
 }
 
 impl Default for Game {

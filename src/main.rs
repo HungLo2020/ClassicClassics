@@ -4,10 +4,10 @@
 #[cfg(feature = "desktop")]
 mod desktop;
 
-use classicclassics::cli::{self, Options};
-use classicclassics::controls::Controls;
-use classicclassics::settings::Settings;
-use classicclassics::{Input, Records, Session, VERSION};
+use classicclassics_collection::cli::{self, Options};
+use classicclassics_collection::controls::Controls;
+use classicclassics_collection::settings::Settings;
+use classicclassics_collection::{Input, Records, Session, VERSION};
 use quasar_config::CommonArgs;
 use quasar_storage::GamePaths;
 use std::path::Path;
@@ -19,11 +19,11 @@ fn main() {
     }
 }
 
-fn run() -> classicclassics::Result {
+fn run() -> classicclassics_collection::Result {
     let mut common = CommonArgs::from_env("CLASSICCLASSICS").map_err(|error| error.to_string())?;
     common.parse_into(std::env::args().skip(1))?;
     if common.help {
-        print!("{}", common.help("classicclassics", cli::HELP));
+        print!("{}", common.help("classicclassics", &cli::help()));
         return Ok(());
     }
     if common.version {
@@ -33,7 +33,7 @@ fn run() -> classicclassics::Result {
     let options = Options::from_common(&common)?;
 
     if let Some(path) = &options.write_default_bindings {
-        quasar_storage::write_json(path, &Controls::default())?;
+        Controls::default().save(path)?;
         println!(
             "Wrote default Classic Classics controls to {}",
             path.display()
@@ -47,42 +47,26 @@ fn run() -> classicclassics::Result {
     }
 
     let paths = GamePaths::discover(Some(Path::new(env!("CARGO_MANIFEST_DIR"))))?;
-    let controls_path = paths.shared_config.join("controls.json");
+    let controls_path = paths.shared_config.join("controls.toml");
     let (controls, save_controls) = if let Some(path) = &options.bindings {
         (Controls::load(path)?, false)
     } else if options.no_save {
         (Controls::default(), false)
     } else {
-        match quasar_storage::read_json::<Controls>(&controls_path) {
-            Ok(Some(controls)) => match controls.validate() {
-                Ok(()) => (controls, false),
-                Err(error) => {
-                    eprintln!("Invalid controls ({error}); preserving file and using defaults");
-                    (Controls::default(), false)
-                }
-            },
-            Ok(None) => (Controls::default(), true),
-            Err(error) => {
-                eprintln!("Cannot load controls ({error}); preserving file and using defaults");
-                (Controls::default(), false)
-            }
-        }
+        Controls::load_saved(&controls_path)
     };
 
     let (mut settings, mut save_settings) = if options.no_save {
         (Settings::default(), false)
     } else {
-        Settings::load(&paths.config.join("display.json"))
+        Settings::load(&paths.config.join("display.toml"))
     };
     if common.config.is_some() || !common.overrides.is_empty() {
         // Explicit run configuration is ephemeral; it never overwrites the
         // machine's saved display settings.
         save_settings = false;
-        apply_settings_overrides(&mut settings, &common)?;
     }
-    settings.width = options.width.unwrap_or(settings.width);
-    settings.height = options.height.unwrap_or(settings.height);
-    settings.fullscreen |= options.fullscreen;
+    settings.apply(&common)?;
     settings.linear |= options.linear;
     settings.integer |= options.integer;
     if options.no_audio {
@@ -95,6 +79,7 @@ fn run() -> classicclassics::Result {
         Records::load(&paths.save.join("records.json"))
     };
     let mut session = Session::new(records, settings);
+    session.controls = controls;
     if let Some(kind) = options.game {
         session.launch(kind);
     }
@@ -102,8 +87,12 @@ fn run() -> classicclassics::Result {
         session.open_settings();
     }
 
+    if options.controls {
+        session.open_controls();
+    }
+
     if options.headless {
-        return run_headless(&options, &mut session, &controls);
+        return run_headless(&options, &mut session);
     }
 
     #[cfg(feature = "desktop")]
@@ -111,7 +100,6 @@ fn run() -> classicclassics::Result {
         desktop::run(
             options,
             session,
-            controls,
             paths,
             desktop::SavePolicy {
                 controls: save_controls,
@@ -127,49 +115,7 @@ fn run() -> classicclassics::Result {
     }
 }
 
-fn apply_settings_overrides(
-    settings: &mut Settings,
-    common: &CommonArgs,
-) -> classicclassics::Result {
-    if let Some(path) = &common.config {
-        *settings = quasar_config::load_file_typed::<Settings>(path)?;
-    }
-    for (key, value) in &common.overrides {
-        let boolean = || -> classicclassics::Result<bool> {
-            Ok(match value.as_str() {
-                "true" | "1" | "yes" | "on" => true,
-                "false" | "0" | "no" | "off" => false,
-                other => return Err(format!("{key} expects a boolean, got '{other}'").into()),
-            })
-        };
-        match key.as_str() {
-            "width" | "window.width" => settings.width = value.parse()?,
-            "height" | "window.height" => settings.height = value.parse()?,
-            "fullscreen" | "window.fullscreen" => settings.fullscreen = boolean()?,
-            "linear" | "display.linear" => settings.linear = boolean()?,
-            "integer" | "display.integer" => settings.integer = boolean()?,
-            "audio" | "audio.enabled" => settings.audio = boolean()?,
-            "volume" | "audio.volume" => settings.volume = value.parse()?,
-            "muted" | "audio.muted" => settings.muted = boolean()?,
-            other => {
-                return Err(format!(
-                    "unknown setting '{other}'; use width, height, fullscreen, linear, integer, audio, volume or muted"
-                )
-                .into());
-            }
-        }
-    }
-    if !settings.valid() {
-        return Err("configuration settings are outside the supported range".into());
-    }
-    Ok(())
-}
-
-fn run_headless(
-    options: &Options,
-    session: &mut Session,
-    controls: &Controls,
-) -> classicclassics::Result {
+fn run_headless(options: &Options, session: &mut Session) -> classicclassics_collection::Result {
     let ticks = options.ticks.unwrap_or(600);
     for _ in 0..ticks {
         let input = if options.autoplay {
@@ -179,7 +125,6 @@ fn run_headless(
         };
         session.tick(input);
     }
-    let hints = controls.hints();
     if let Some(path) = &options.screenshot {
         if let Some(parent) = path
             .parent()
@@ -188,14 +133,9 @@ fn run_headless(
             std::fs::create_dir_all(parent)?;
         }
         let textures = quasar_render_2d::Textures::default();
-        let canvas = session.scene(&hints);
+        let canvas = session.scene();
         let pixels = quasar_render_2d::reference::rasterize(&canvas, &textures)?;
-        quasar_render_2d::write_png(
-            path,
-            classicclassics::WIDTH,
-            classicclassics::HEIGHT,
-            &pixels,
-        )?;
+        quasar_render_2d::write_png(path, canvas.width(), canvas.height(), &pixels)?;
     }
     if let Some(path) = &options.state {
         quasar_storage::write_json(path, &session.state_json())?;

@@ -19,7 +19,20 @@ suite covers:
   and quit outcomes;
 - menu launch/back navigation, settings freeze and state serialization;
 - full draw-list validation through `Canvas::validate` and a 960×600 headless
-  rasterisation.
+  rasterisation;
+- six-card page bounds, navigation across partial rows and additional pages;
+- registered game serialization and deterministic continuation, legacy record schemas;
+- TOML round trips, JSON preference migration, invalid-file preservation,
+  monitor-resolution fallback and explicit windowed CLI precedence.
+
+All workspace packages are default members. Test a single game independently:
+
+```sh
+cargo test --locked -p classicclassics-pong
+cargo tree --locked -p classicclassics-pong -e features
+```
+
+The game dependency tree must remain free of native window/audio/gamepad backends.
 
 ## Headless screenshots
 
@@ -36,6 +49,8 @@ cargo run --locked --no-default-features -- \
   --headless --game asteroids --settings --ticks 1 --screenshot /tmp/settings.png
 ```
 
+The catalog screenshot is 1920×1080; game screenshots remain 960×600.
+
 `--state` writes a JSON snapshot with the selected menu entry, records and the
 current game state. `--ticks` counts fixed simulation ticks, not frames.
 
@@ -51,10 +66,27 @@ The full build adds `quasar-window`, VulkanicGAL, `quasar-audio`'s CPAL backend
 and the `gilrs` gamepad adapter. Unit tests still do not require a GPU; the
 windowed smoke test does.
 
+## Shared controls
+
+```sh
+cargo run --locked --no-default-features -- --headless --no-save --controls \
+  --ticks 1 --screenshot /tmp/controls.png
+cargo run --locked -- --no-save --controls --smoke-frames 10
+```
+
+Tests cover modal capture isolation/cancellation, keyboard chords and modifier
+keys, mouse/gamepad buttons, digital axis pairs, stick orientation and neutral
+arming, device-specific cell replacement/clearing, mouse hit testing at different
+canvas sizes, category/column navigation, restoring defaults, TOML round trips, preset migration,
+and remapped catalog navigation. The host integration test navigates the shared
+editor, changes Fire, saves/reloads the preset, and uses it in both Pong and
+Asteroids. Native checks should also exercise Escape/arrow/Enter recovery after
+clearing navigation, shared key notices and focus-loss cancellation.
+
 ## Native smoke test
 
 ```sh
-cargo run -- --game pong --autoplay --no-save \
+cargo run -- --game pong --autoplay --no-save --windowed \
   --smoke-frames 30 --exercise-window
 ```
 
@@ -64,10 +96,12 @@ restores the size and presents the remaining frames. Startup fullscreen and the
 settings overlay are also covered by the smoke commands:
 
 ```sh
-cargo run -- --no-save --fullscreen --smoke-frames 10
+cargo run -- --no-save --smoke-frames 10
+cargo run -- --no-save --windowed --resolution 1280x720 --smoke-frames 10
 cargo run -- --no-save --game lunar --settings --smoke-frames 10
 ``` It prints
-`presented_frames`, the exercise stage reached and `RenderStats`. The same run
+`presented_frames`, the exercise stage, actual fullscreen state, resolved
+resolution and `RenderStats`. The same run
 can target Lunar Lander or Asteroids by changing `--game`.
 
 A machine without a Vulkan 1.3 driver cannot run this step. That is expected;
@@ -75,6 +109,18 @@ the headless suite and reference renderer still verify all simulation and draw
 list behaviour.
 
 ## Release verification
+
+Release publication is manual and separate from normal commits/pushes. Test the
+publisher locally against its simulated API (this never publishes):
+
+```sh
+python3 -m unittest DevUtils.test_release
+```
+
+These checks cover first publication, replacing the same release/tag, version
+changes, failed/corrupt uploads preserving the previous asset, draft retries,
+stale commits and failed CI.
+
 
 ```sh
 python3 DevUtils/package.py
@@ -89,5 +135,8 @@ catalog entry's schema, id, repository and launch path.
 
 `.github/workflows/ci.yml` runs formatting, Clippy with `-D warnings`, the full
 test suite, the core-only test suite and a headless render smoke test on
-Ubuntu 24.04. `.github/workflows/release.yml` repeats the build on a version tag,
-packages and verifies the ZIP, uploads it and publishes the GitHub Release.
+Ubuntu 24.04, including simulated release-tool tests. It never publishes.
+`.github/workflows/release.yml` runs only by explicit manual dispatch, requires
+successful CI for the requested current main SHA, packages/verifies the ZIP and
+replaces the single `Latest` release. Use the project release skill to dispatch,
+watch and verify both the Actions artifact and the ZIP Basalt downloads.

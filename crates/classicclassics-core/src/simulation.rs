@@ -1,8 +1,4 @@
-//! Pure fixed-step simulations and their Quasar draw lists.
-
-pub mod asteroids;
-pub mod lunar;
-pub mod pong;
+//! Deterministic helpers shared by game simulations.
 
 use serde::{Deserialize, Serialize};
 

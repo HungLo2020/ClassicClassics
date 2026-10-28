@@ -1,12 +1,13 @@
 //! Lunar Lander: a vector-drawn gravity descent with fuel, rotating thrust and
 //! multiplier landing pads.
 
-use crate::audio::Sound;
-use crate::controls::ControlHints;
-use crate::games::{Particle, Rng, update_particles};
-use crate::paint::{AMBER, CORAL, CYAN, DIM, GREEN, GRID, MUTED, Paint, RED, WHITE, world};
-use crate::session::{Input, Records};
-use crate::{HEIGHT, TICK_HZ, WIDTH};
+use classicclassics_core::ControlHints;
+use classicclassics_core::paint::{
+    AMBER, CORAL, CYAN, DIM, GREEN, GRID, MUTED, Paint, RED, WHITE, world,
+};
+use classicclassics_core::simulation::{Particle, Rng, update_particles};
+use classicclassics_core::{ArcadeGame, GameInfo, Input, Sound};
+use classicclassics_core::{HEIGHT, TICK_HZ, WIDTH};
 use quasar_render_2d::Canvas;
 use serde::{Deserialize, Serialize};
 
@@ -147,7 +148,142 @@ impl Game {
         }
     }
 
-    pub fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
+    fn land(&mut self, pad: Pad, sounds: &mut Vec<Sound>) {
+        let bonus = pad.multiplier * (120 + self.fuel.round() as u32);
+        self.last_bonus = bonus;
+        self.score = self.score.saturating_add(bonus);
+        self.landings = self.landings.saturating_add(1);
+        self.phase = Phase::Landed;
+        self.timer = 1.9;
+        for index in 0..18 {
+            let angle = index as f32 / 18.0 * std::f32::consts::TAU;
+            let speed = 35.0 + (index % 5) as f32 * 12.0;
+            self.particles.push(Particle::new(
+                [self.x, self.y + 16.0],
+                [angle.cos() * speed, angle.sin().abs() * speed * 0.4],
+                0.8,
+                2,
+            ));
+        }
+        sounds.push(Sound::Landing);
+    }
+
+    fn crash(&mut self, sounds: &mut Vec<Sound>) {
+        if self.phase == Phase::Crashed {
+            return;
+        }
+        self.phase = Phase::Crashed;
+        self.timer = 1.55;
+        self.crashes = self.crashes.saturating_add(1);
+        for index in 0..34 {
+            let angle = index as f32 / 34.0 * std::f32::consts::TAU;
+            let speed = 35.0 + (index % 7) as f32 * 16.0;
+            self.particles.push(Particle::new(
+                [self.x, self.y],
+                [angle.cos() * speed, angle.sin() * speed - 12.0],
+                1.1,
+                if index % 3 == 0 { 0 } else { 1 },
+            ));
+        }
+        sounds.push(Sound::Crash);
+    }
+
+    fn respawn(&mut self, next_level: bool) {
+        if next_level {
+            self.level = self.level.saturating_add(1);
+        }
+        self.terrain = Terrain::generate(self.level);
+        self.x = 130.0 + (self.level as f32 * 73.0) % 680.0;
+        self.y = 74.0;
+        self.vx = 24.0 + (self.level % 4) as f32 * 3.0;
+        self.vy = 0.0;
+        self.angle = 0.0;
+        self.fuel = MAX_FUEL;
+        self.phase = Phase::Flying;
+        self.paused = false;
+        self.timer = 0.0;
+        self.last_bonus = 0;
+        self.particles.clear();
+        self.thrust_sound_timer = 0.0;
+    }
+
+    fn draw_lander(&self, paint: &mut Paint, hints: &ControlHints) {
+        let position = [self.x, self.y];
+        let body = [
+            world(position, self.angle, [-10.0, -13.0]),
+            world(position, self.angle, [10.0, -13.0]),
+            world(position, self.angle, [15.0, 5.0]),
+            world(position, self.angle, [8.0, 15.0]),
+            world(position, self.angle, [-8.0, 15.0]),
+            world(position, self.angle, [-15.0, 5.0]),
+        ];
+        paint.glow_polyline(&body, 1.8, [75, 58, 26, 255], AMBER, true);
+        paint.line(
+            world(position, self.angle, [-8.0, 15.0]),
+            world(position, self.angle, [-15.0, 24.0]),
+            1.5,
+            AMBER,
+        );
+        paint.line(
+            world(position, self.angle, [8.0, 15.0]),
+            world(position, self.angle, [15.0, 24.0]),
+            1.5,
+            AMBER,
+        );
+        paint.line(
+            world(position, self.angle, [-15.0, 24.0]),
+            world(position, self.angle, [-9.0, 24.0]),
+            2.0,
+            AMBER,
+        );
+        paint.line(
+            world(position, self.angle, [15.0, 24.0]),
+            world(position, self.angle, [9.0, 24.0]),
+            2.0,
+            AMBER,
+        );
+        paint.line(
+            world(position, self.angle, [-7.0, -2.0]),
+            world(position, self.angle, [-7.0, 9.0]),
+            1.0,
+            [125, 101, 48, 255],
+        );
+        paint.line(
+            world(position, self.angle, [7.0, -2.0]),
+            world(position, self.angle, [7.0, 9.0]),
+            1.0,
+            [125, 101, 48, 255],
+        );
+        paint.circle(world(position, self.angle, [0.0, 1.0]), 3.0, 1.0, CYAN);
+        if self.fuel < 25.0 {
+            paint.text(self.x - 20.0, self.y - 36.0, "LOW FUEL", 1.0, RED);
+        }
+        let _ = hints;
+    }
+
+    fn altitude(&self) -> f32 {
+        (self.terrain.y_at(self.x) - self.y).max(0.0)
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Record {
+    pub best_score: u32,
+    pub landings: u32,
+    pub crashes: u32,
+}
+
+impl ArcadeGame for Game {
+    type Record = Record;
+    const INFO: GameInfo = GameInfo {
+        name: "LUNAR LANDER",
+        aliases: &["lunar", "lunar-lander"],
+        tagline: "GRAVITY IS PATIENT.",
+        accent: classicclassics_core::paint::AMBER,
+    };
+
+    fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         self.ticks += 1;
         if input.restart {
             self.respawn(false);
@@ -232,72 +368,13 @@ impl Game {
         }
     }
 
-    fn land(&mut self, pad: Pad, sounds: &mut Vec<Sound>) {
-        let bonus = pad.multiplier * (120 + self.fuel.round() as u32);
-        self.last_bonus = bonus;
-        self.score = self.score.saturating_add(bonus);
-        self.landings = self.landings.saturating_add(1);
-        self.phase = Phase::Landed;
-        self.timer = 1.9;
-        for index in 0..18 {
-            let angle = index as f32 / 18.0 * std::f32::consts::TAU;
-            let speed = 35.0 + (index % 5) as f32 * 12.0;
-            self.particles.push(Particle::new(
-                [self.x, self.y + 16.0],
-                [angle.cos() * speed, angle.sin().abs() * speed * 0.4],
-                0.8,
-                2,
-            ));
-        }
-        sounds.push(Sound::Landing);
+    fn record(&mut self, records: &mut Record) {
+        records.best_score = records.best_score.max(self.score);
+        records.landings = records.landings.max(self.landings);
+        records.crashes = records.crashes.max(self.crashes);
     }
 
-    fn crash(&mut self, sounds: &mut Vec<Sound>) {
-        if self.phase == Phase::Crashed {
-            return;
-        }
-        self.phase = Phase::Crashed;
-        self.timer = 1.55;
-        self.crashes = self.crashes.saturating_add(1);
-        for index in 0..34 {
-            let angle = index as f32 / 34.0 * std::f32::consts::TAU;
-            let speed = 35.0 + (index % 7) as f32 * 16.0;
-            self.particles.push(Particle::new(
-                [self.x, self.y],
-                [angle.cos() * speed, angle.sin() * speed - 12.0],
-                1.1,
-                if index % 3 == 0 { 0 } else { 1 },
-            ));
-        }
-        sounds.push(Sound::Crash);
-    }
-
-    fn respawn(&mut self, next_level: bool) {
-        if next_level {
-            self.level = self.level.saturating_add(1);
-        }
-        self.terrain = Terrain::generate(self.level);
-        self.x = 130.0 + (self.level as f32 * 73.0) % 680.0;
-        self.y = 74.0;
-        self.vx = 24.0 + (self.level % 4) as f32 * 3.0;
-        self.vy = 0.0;
-        self.angle = 0.0;
-        self.fuel = MAX_FUEL;
-        self.phase = Phase::Flying;
-        self.paused = false;
-        self.timer = 0.0;
-        self.last_bonus = 0;
-        self.particles.clear();
-        self.thrust_sound_timer = 0.0;
-    }
-
-    pub fn record(&self, records: &mut Records) {
-        records.lunar.best_score = records.lunar.best_score.max(self.score);
-        records.lunar.landings = records.lunar.landings.max(self.landings);
-        records.lunar.crashes = records.lunar.crashes.max(self.crashes);
-    }
-
-    pub fn autoplay(&self) -> Input {
+    fn autoplay(&self) -> Input {
         if self.phase != Phase::Flying {
             return Input::default();
         }
@@ -330,7 +407,7 @@ impl Game {
         }
     }
 
-    pub fn summary(&self) -> String {
+    fn summary(&self) -> String {
         format!(
             "phase={:?} level={} score={} fuel={:.1} v=({:.1},{:.1}) landings={} crashes={}",
             self.phase,
@@ -344,7 +421,7 @@ impl Game {
         )
     }
 
-    pub fn scene(&self, hints: &ControlHints) -> Canvas {
+    fn scene(&self, hints: &ControlHints) -> Canvas {
         let mut paint = Paint::new(WIDTH, HEIGHT);
         paint.background();
         paint.starfield(0x1A4D3E, 150, [42, 49, 60, 255]);
@@ -528,62 +605,72 @@ impl Game {
         paint.into_canvas()
     }
 
-    fn draw_lander(&self, paint: &mut Paint, hints: &ControlHints) {
-        let position = [self.x, self.y];
-        let body = [
-            world(position, self.angle, [-10.0, -13.0]),
-            world(position, self.angle, [10.0, -13.0]),
-            world(position, self.angle, [15.0, 5.0]),
-            world(position, self.angle, [8.0, 15.0]),
-            world(position, self.angle, [-8.0, 15.0]),
-            world(position, self.angle, [-15.0, 5.0]),
-        ];
-        paint.glow_polyline(&body, 1.8, [75, 58, 26, 255], AMBER, true);
-        paint.line(
-            world(position, self.angle, [-8.0, 15.0]),
-            world(position, self.angle, [-15.0, 24.0]),
-            1.5,
-            AMBER,
-        );
-        paint.line(
-            world(position, self.angle, [8.0, 15.0]),
-            world(position, self.angle, [15.0, 24.0]),
-            1.5,
-            AMBER,
-        );
-        paint.line(
-            world(position, self.angle, [-15.0, 24.0]),
-            world(position, self.angle, [-9.0, 24.0]),
-            2.0,
-            AMBER,
-        );
-        paint.line(
-            world(position, self.angle, [15.0, 24.0]),
-            world(position, self.angle, [9.0, 24.0]),
-            2.0,
-            AMBER,
-        );
-        paint.line(
-            world(position, self.angle, [-7.0, -2.0]),
-            world(position, self.angle, [-7.0, 9.0]),
-            1.0,
-            [125, 101, 48, 255],
-        );
-        paint.line(
-            world(position, self.angle, [7.0, -2.0]),
-            world(position, self.angle, [7.0, 9.0]),
-            1.0,
-            [125, 101, 48, 255],
-        );
-        paint.circle(world(position, self.angle, [0.0, 1.0]), 3.0, 1.0, CYAN);
-        if self.fuel < 25.0 {
-            paint.text(self.x - 20.0, self.y - 36.0, "LOW FUEL", 1.0, RED);
-        }
-        let _ = hints;
+    fn catalog_record(record: &Record) -> (&'static str, String) {
+        ("BEST SCORE", record.best_score.to_string())
     }
 
-    fn altitude(&self) -> f32 {
-        (self.terrain.y_at(self.x) - self.y).max(0.0)
+    fn motif(paint: &mut Paint, cx: f32, cy: f32, accent: [u8; 4]) {
+        use classicclassics_core::paint::{AMBER, world};
+        paint.glow_circle([cx + 52.0, cy - 38.0], 17.0, 1.0, [54, 78, 92, 255]);
+        let terrain = [
+            [cx - 86.0, cy + 54.0],
+            [cx - 50.0, cy + 28.0],
+            [cx - 18.0, cy + 41.0],
+            [cx + 5.0, cy + 52.0],
+            [cx + 35.0, cy + 52.0],
+            [cx + 62.0, cy + 30.0],
+            [cx + 88.0, cy + 47.0],
+        ];
+        paint.glow_polyline(&terrain, 1.5, [50, 42, 26, 255], [103, 88, 50, 255], false);
+        paint.line([cx + 5.0, cy + 52.0], [cx + 35.0, cy + 52.0], 3.0, AMBER);
+        paint.text(cx + 8.0, cy + 56.0, "x3", 1.0, AMBER);
+
+        let lander = [cx - 8.0, cy - 4.0];
+        let body = [
+            world(lander, 0.15, [-12.0, -10.0]),
+            world(lander, 0.15, [12.0, -10.0]),
+            world(lander, 0.15, [15.0, 6.0]),
+            world(lander, 0.15, [8.0, 15.0]),
+            world(lander, 0.15, [-8.0, 15.0]),
+            world(lander, 0.15, [-15.0, 6.0]),
+        ];
+        paint.glow_polyline(&body, 1.4, [62, 49, 25, 255], accent, true);
+        paint.line(
+            world(lander, 0.15, [-8.0, 15.0]),
+            world(lander, 0.15, [-15.0, 23.0]),
+            1.2,
+            accent,
+        );
+        paint.line(
+            world(lander, 0.15, [8.0, 15.0]),
+            world(lander, 0.15, [15.0, 23.0]),
+            1.2,
+            accent,
+        );
+        paint.line(
+            world(lander, 0.15, [-15.0, 23.0]),
+            world(lander, 0.15, [-10.0, 23.0]),
+            1.2,
+            accent,
+        );
+        paint.line(
+            world(lander, 0.15, [15.0, 23.0]),
+            world(lander, 0.15, [10.0, 23.0]),
+            1.2,
+            accent,
+        );
+        paint.line(
+            world(lander, 0.15, [-4.0, 16.0]),
+            world(lander, 0.15, [-2.0, 28.0]),
+            1.0,
+            [255, 210, 120, 255],
+        );
+        paint.line(
+            world(lander, 0.15, [4.0, 16.0]),
+            world(lander, 0.15, [2.0, 31.0]),
+            1.0,
+            [255, 210, 120, 255],
+        );
     }
 }
 
@@ -596,7 +683,7 @@ impl Default for Game {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::games::wrap;
+    use classicclassics_core::simulation::wrap;
 
     #[test]
     fn every_level_has_three_pads_on_the_terrain() {

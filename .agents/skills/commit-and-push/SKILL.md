@@ -9,6 +9,10 @@ Use this workflow only when the user explicitly asks to commit and push. Do not
 run it automatically during ordinary edits. Never force-push, rewrite history,
 delete tags, or modify another repository.
 
+Normal commit/push runs CI only. Never dispatch Release, create/move `Latest`,
+or publish assets as part of this skill. Publishing is a separate explicit
+request handled by [release](../release/SKILL.md).
+
 ## 1. Preflight
 
 ```sh
@@ -38,6 +42,7 @@ cargo fmt --all -- --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
 cargo test --locked --no-default-features
+python3 -m unittest DevUtils.test_release
 ```
 
 If packaging, metadata, artwork, the catalog entry, or release workflows changed:
@@ -62,7 +67,7 @@ git status --short
 Otherwise stage explicit paths:
 
 ```sh
-git add src/ README.md docs/ .agents/ .github/ DevUtils/ Cargo.toml Cargo.lock ClassicClassics.json
+git add src/ crates/ .gitignore README.md docs/ .agents/ .github/ DevUtils/ Cargo.toml Cargo.lock ClassicClassics.json
 ```
 
 Write a descriptive Conventional Commit message, for example:
@@ -109,9 +114,9 @@ Requirements:
 
 - Fix the cause, rerun the local verification, commit the fix, push again, and
   watch the new runs.
-- If a tag release workflow fails because the tag and Cargo version differ, fix
-  the version or tag deliberately. Do not delete or move a published tag without
-  explicit user approval.
+- A normal push must not start `Release`. If it does, inspect and correct its
+  trigger configuration. `Latest` moves only during an explicitly requested
+  release through the separate release skill.
 - If `gh` is unavailable or unauthenticated, report that clearly and provide the
   commit URL plus the exact command the user can run to watch the run. Do not
   claim success without evidence.

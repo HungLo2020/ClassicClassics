@@ -17,17 +17,26 @@ Use this skill when modifying the Classic Classics repository.
 - Never write to `app/` at runtime.
 - User progress goes to `data/save/`; machine settings to `data/config/`;
   portable settings to `data/config/shared/`; rebuildable files to
-  `data/cache/`. Persist through `quasar_storage::write_json`.
+  `data/cache/`. Persist JSON through `quasar_storage::write_json`; TOML preferences use the
+  collection's atomic `config_file` adapter (Quasar has no TOML writer).
 - Do not modify other projects or repositories.
 
 ## Change checklist
 
-1. Add or change pure simulation state in `src/games/<game>.rs`.
-2. Add actions to `src/controls.rs` with defaults, validation and HUD hints.
-3. Emit audio events through `src/audio.rs`; never load audio files.
+1. Add or change pure simulation state in `crates/classicclassics-<game>/src/lib.rs`.
+   Implement `classicclassics_core::ArcadeGame` and register new games in
+   `crates/classicclassics-collection/src/games.rs`. Keep each game independent
+   of other games and the collection.
+2. Add actions to `crates/classicclassics-collection/src/controls.rs` with defaults,
+   validation and HUD hints. Shared remapping uses Quasar UI in `controls_screen.rs`;
+   the host applies `Session::controls` with `sync_controls`. Never bind physical
+   keys in a game crate.
+3. Emit shared `Sound` events. Synthesis and native playback live in
+   `crates/classicclassics-collection/src/audio.rs`; never load audio files.
 4. Verify the draw list is deterministic and validates with
    `Canvas::validate`.
-5. Update records in `src/session.rs` only when a result changes, not every tick.
+5. Keep game record schemas and update rules in each game crate. The collection
+   session aggregates records and handles persistence; preserve existing saves.
 6. Add deterministic unit tests and, for visual changes, run the headless
    screenshot command.
 7. Run:

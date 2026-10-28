@@ -29,18 +29,34 @@ pub const BLUE: Color = [112, 177, 255, 255];
 /// transform after every vector primitive.
 pub struct Paint {
     canvas: Canvas,
+    transform: Transform2D,
 }
 
 impl Paint {
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             canvas: Canvas::new(width, height).expect("valid logical canvas"),
+            transform: Transform2D::IDENTITY,
         }
     }
 
     /// Continue drawing on an existing scene, used for modal overlays.
     pub fn over(canvas: Canvas) -> Self {
-        Self { canvas }
+        Self {
+            canvas,
+            transform: Transform2D::IDENTITY,
+        }
+    }
+
+    /// Fit subsequent drawing in a centered logical view, preserving aspect.
+    pub fn fit_view(&mut self, width: u32, height: u32) {
+        let scale = (self.canvas.width() as f32 / width as f32)
+            .min(self.canvas.height() as f32 / height as f32);
+        self.transform = Transform2D::scale(scale, scale).then(Transform2D::translation(
+            (self.canvas.width() as f32 - width as f32 * scale) * 0.5,
+            (self.canvas.height() as f32 - height as f32 * scale) * 0.5,
+        ));
+        self.canvas.set_transform(self.transform);
     }
 
     pub fn canvas(&self) -> &Canvas {
@@ -52,7 +68,13 @@ impl Paint {
     }
 
     pub fn background(&mut self) {
-        self.rect(0.0, 0.0, 960.0, 600.0, VOID);
+        self.rect(
+            0.0,
+            0.0,
+            self.canvas.width() as f32,
+            self.canvas.height() as f32,
+            VOID,
+        );
     }
 
     pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: Color) {
@@ -70,10 +92,16 @@ impl Paint {
         self.canvas.text([x, y], text, scale, color);
     }
 
-    /// Draws text centred on the 960-pixel logical canvas.
+    /// Draws text centred on the logical canvas.
     pub fn centered(&mut self, y: f32, text: &str, scale: f32, color: Color) {
         let width = text.chars().count() as f32 * 6.0 * scale - scale;
-        self.text((960.0 - width) / 2.0, y, text, scale, color);
+        self.text(
+            (self.canvas.width() as f32 - width) / 2.0,
+            y,
+            text,
+            scale,
+            color,
+        );
     }
 
     /// Text against the right edge with a pixel margin.
@@ -100,11 +128,13 @@ impl Paint {
         let angle = dy.atan2(dx);
         let midpoint = [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5];
         self.canvas.set_transform(
-            Transform2D::rotation(angle).then(Transform2D::translation(midpoint[0], midpoint[1])),
+            Transform2D::rotation(angle)
+                .then(Transform2D::translation(midpoint[0], midpoint[1]))
+                .then(self.transform),
         );
         self.canvas
             .rect(Rect::new(-length * 0.5, -width * 0.5, length, width), color);
-        self.canvas.set_transform(Transform2D::IDENTITY);
+        self.canvas.set_transform(self.transform);
     }
 
     /// A bright line with a wider muted halo, the core vector-arcade look.
@@ -193,8 +223,9 @@ impl Paint {
             state ^= state << 13;
             state ^= state >> 17;
             state ^= state << 5;
-            let x = (state % 956) as f32 + 2.0;
-            let y = (state.wrapping_mul(7) % 596) as f32 + 2.0;
+            let x = (state % self.canvas.width().saturating_sub(4).max(1)) as f32 + 2.0;
+            let y = (state.wrapping_mul(7) % self.canvas.height().saturating_sub(4).max(1)) as f32
+                + 2.0;
             let size = if state & 31 == 0 { 2.0 } else { 1.0 };
             self.rect(x, y, size, size, brightness);
         }

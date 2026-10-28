@@ -9,23 +9,7 @@ use quasar_audio::Clip;
 
 pub const SAMPLE_RATE: u32 = 48_000;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Sound {
-    MenuMove,
-    MenuSelect,
-    Paddle,
-    Wall,
-    Score,
-    Win,
-    Thrust,
-    Explosion,
-    Laser,
-    Landing,
-    Crash,
-    ExtraLife,
-    GameOver,
-    Hyperspace,
-}
+pub use classicclassics_core::Sound;
 
 pub struct SoundBank {
     menu_move: Clip,

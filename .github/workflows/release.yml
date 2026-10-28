@@ -1,12 +1,21 @@
 name: Release
+run-name: Release Latest (${{ inputs.commit }})
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      commit:
+        description: Full SHA of the current main commit with successful CI
+        required: true
+        type: string
 
 permissions:
   contents: write
+  actions: read
+
+concurrency:
+  group: classicclassics-release-latest
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,7 +24,23 @@ jobs:
   linux-x64:
     runs-on: ubuntu-24.04
     steps:
+      - name: Require an explicit main commit
+        env:
+          RELEASE_COMMIT: ${{ inputs.commit }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          assert os.environ["GITHUB_REF"] == "refs/heads/main", "dispatch Release on main"
+          assert re.fullmatch(r"[0-9a-f]{40}", os.environ["RELEASE_COMMIT"]), "provide a full commit SHA"
+          PY
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+      - name: Require successful CI for the requested commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ inputs.commit }}
+        run: python3 -m DevUtils.release --check-only --commit "$RELEASE_COMMIT"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -30,14 +55,6 @@ jobs:
             libvulkan-dev
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
-      - name: Check tag matches package version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          version="$(cargo metadata --no-deps --format-version 1 --locked | python3 -c 'import json,sys; m=json.load(sys.stdin); print(next(p["version"] for p in m["packages"] if p["name"]=="classicclassics"))')"
-          test "v${version}" = "${GITHUB_REF_NAME}" || {
-            echo "tag ${GITHUB_REF_NAME} does not match Cargo version ${version}" >&2
-            exit 1
-          }
       - name: Build and package
         run: |
           python3 DevUtils/package.py
@@ -49,10 +66,8 @@ jobs:
           name: ClassicClassics-linux-x64
           path: dist/*.zip
           if-no-files-found: error
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.zip
-          generate_release_notes: true
-          fail_on_unmatched_files: true
+      - name: Replace the rolling Latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ inputs.commit }}
+        run: python3 -m DevUtils.release --commit "$RELEASE_COMMIT" --archive dist/ClassicClassics-*-linux-x64.zip

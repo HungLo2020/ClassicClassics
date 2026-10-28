@@ -7,7 +7,8 @@ use std::path::PathBuf;
 
 pub const HELP: &str = "\
 Game options:
-  --game NAME               start in pong, lunar, asteroids, or menu
+  --game NAME               start a registered game or the menu
+  --controls                open shared global control mapping
   --settings                open the settings overlay at startup
   --ticks N                 fixed ticks for headless/autoplay runs
   --autoplay                deterministic attract mode
@@ -23,12 +24,18 @@ Game options:
   --check-bindings PATH
 ";
 
+pub fn help() -> String {
+    let names = GameKind::ALL
+        .into_iter()
+        .map(|kind| kind.info().aliases[0])
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{HELP}\nAvailable games: {names}, menu\n")
+}
+
 #[derive(Clone, Debug)]
 pub struct Options {
     pub headless: bool,
-    pub fullscreen: bool,
-    pub width: Option<u32>,
-    pub height: Option<u32>,
     pub linear: bool,
     pub integer: bool,
     pub no_audio: bool,
@@ -36,6 +43,7 @@ pub struct Options {
     pub no_save: bool,
     pub game: Option<GameKind>,
     pub settings: bool,
+    pub controls: bool,
     pub ticks: Option<usize>,
     pub autoplay: bool,
     pub screenshot: Option<PathBuf>,
@@ -51,9 +59,6 @@ impl Options {
     pub fn from_common(common: &CommonArgs) -> Result<Self> {
         let mut options = Self {
             headless: common.is_headless(),
-            fullscreen: common.fullscreen.unwrap_or(false),
-            width: common.resolution.map(|resolution| resolution.width),
-            height: common.resolution.map(|resolution| resolution.height),
             linear: false,
             integer: false,
             no_audio: common.no_audio.unwrap_or(false),
@@ -61,6 +66,7 @@ impl Options {
             no_save: false,
             game: None,
             settings: false,
+            controls: false,
             ticks: None,
             autoplay: false,
             screenshot: None,
@@ -86,23 +92,17 @@ impl Options {
             };
             match flag {
                 "--game" => {
-                    options.game = Some(match value()?.as_str() {
-                        "pong" => GameKind::Pong,
-                        "lunar" | "lunar-lander" => GameKind::LunarLander,
-                        "asteroids" => GameKind::Asteroids,
-                        "menu" => {
-                            options.game = None;
-                            continue;
-                        }
-                        other => {
-                            return Err(format!(
-                                "unknown game '{other}'; use pong, lunar, asteroids or menu"
-                            )
-                            .into());
-                        }
-                    });
+                    let name = value()?;
+                    options.game = if name == "menu" {
+                        None
+                    } else {
+                        Some(GameKind::from_alias(&name).ok_or_else(|| {
+                            format!("unknown game '{name}'; use --help to list games")
+                        })?)
+                    };
                 }
                 "--settings" => options.settings = true,
+                "--controls" => options.controls = true,
                 "--ticks" => options.ticks = Some(value()?.parse()?),
                 "--autoplay" => options.autoplay = true,
                 "--screenshot" => options.screenshot = Some(value()?.into()),

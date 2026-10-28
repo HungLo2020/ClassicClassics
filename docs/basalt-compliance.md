@@ -23,8 +23,9 @@ and marked for this project. Any deviation is called out explicitly.
 
 **Robustness**
 
-- [x] Save files are written atomically by `quasar_storage::write_json`
-      (temporary file in the same directory, `sync_all`, rename).
+- [x] JSON saves are written atomically by `quasar_storage::write_json`;
+      TOML preferences use the collection adapter with the same temporary-file,
+      `sync_all` and rename contract (Quasar 0.2.16 has no TOML writer).
 - [x] Synced data contains no absolute paths, machine identifiers or lock files.
 - [x] Saves from older versions load. Format version 1 is accepted; unknown
       versions are preserved and defaults are used rather than overwriting.
@@ -33,8 +34,8 @@ and marked for this project. Any deviation is called out explicitly.
 
 **Packaging and launch**
 
-- [x] Releases are GitHub Release `.zip` assets with predictable,
-      platform-tagged names: `ClassicClassics-<version>-linux-x64.zip`.
+- [x] Explicit releases replace one rolling `Latest` tag/release, separate from
+      normal commit/push CI. Assets have predictable platform-tagged names: `ClassicClassics-<version>-linux-x64.zip`.
 - [x] The release bundles the executable, cover, icon and runtime notes. It
       relies only on a standard Linux desktop: glibc, a Vulkan 1.3 driver, and
       the desktop's X11/Wayland and audio stack. There is no Electron/JRE/Python
