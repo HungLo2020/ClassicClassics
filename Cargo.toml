@@ -22,13 +22,13 @@ gamepad = ["quasar-input/gilrs"]
 audio = ["quasar-audio/native"]
 
 [dependencies]
-quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", default-features = false }
-quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", default-features = false, features = ["json"] }
-quasar-core = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10" }
-quasar-input = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10" }
-quasar-render-2d = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", default-features = false, features = ["png"] }
-quasar-storage = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10" }
-quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.10", optional = true }
+quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false }
+quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["json"] }
+quasar-core = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
+quasar-input = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
+quasar-render-2d = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["png"] }
+quasar-storage = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
+quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
