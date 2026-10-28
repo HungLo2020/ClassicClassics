@@ -2,8 +2,9 @@
 
 A single-window arcade collection built almost entirely from
 [Quasar](https://github.com/HungLo2020/Quasar) infrastructure: Pong, Lunar
-Lander and Asteroids, with vector-style rendering, generated sound, persistent
-high scores and a Basalt-ready Linux release.
+Lander, Asteroids, Micro Mages, Jackal, Missile Command and River Raid, with
+vector and original pixel rendering, shared controls, persistent high scores
+and a Basalt-ready Linux release.
 
 ![Classic Classics cover](app/basalt/cover.png)
 
@@ -18,10 +19,14 @@ and the [Basalt Game Standard](https://github.com/HungLo2020/Basalt/blob/main/ST
 | **Pong** | Neon arcade | First to seven. Solo versus the computer or local two-player. |
 | **Lunar Lander** | Vector flight | Rotate and burn fuel to land softly, upright and on a multiplier pad. |
 | **Asteroids** | Vector space | Inertial flight, wrap-around space, splitting rocks, three lives. |
+| **Micro Mages** | Cooperative platforming | Original tower campaign, spells and jumping; 1–4 local players. |
+| **Jackal** | Overhead action | Rescue prisoners and fight through six stages; 1–2 local players. |
+| **Missile Command** | Arcade defense | Aim and fire three batteries to protect six cities. |
+| **River Raid** | Scrolling shooter | Navigate the river, destroy targets and manage fuel. |
 
 The catalog screen is the entry point. It uses a 1920×1080 logical canvas with
 a three-column, two-row grid (six cards per page), and pages automatically as
-games are added. The initial three games occupy the first row.
+games are added. The first page holds six games; River Raid is on page two.
 
 The game starts in borderless fullscreen on the detected monitor, with a
 1920×1080 fallback. Saved preferences and explicit `--windowed` or
@@ -37,10 +42,15 @@ or freezes a running game. **Backspace** returns from a game to the catalog.
 | Action | Keyboard | Gamepad |
 |---|---|---|
 | Navigate catalog | W/S/A/D or arrows | D-pad or left stick |
-| Confirm / serve / fire | Enter or Space | South |
+| Confirm | Enter or Space | South |
 | Settings | Escape | East |
 | Back to catalog | Backspace | Select |
 | Pong paddles | W/S, arrows in two-player | Left/right stick |
+| Imported game movement / aim | WASD; mouse aim in Missile Command | D-pad or left stick |
+| Imported primary fire | Left mouse | South / RT |
+| Jump / right missile battery | Space or middle mouse | North |
+| Grenade / left missile battery | Shift or right mouse | West |
+| Imported player two | Arrows; Numpad 0 fire, 1 jump, 2 grenade | Second controller |
 | Rotate ship / lander | A/D or Left/Right | Left stick |
 | Thrust | W or Up | Triggers |
 | Hyperspace | Shift | West |
@@ -50,6 +60,8 @@ or freezes a running game. **Backspace** returns from a game to the catalog.
 | Mute | M | — |
 | Fullscreen | F11 or Alt+Enter | — |
 | Filter / scaling | F2 / F3 | — |
+
+See [Imported games](docs/imported-games.md) for setup screens, multiplayer and per-game controls.
 
 ### Settings
 
@@ -94,7 +106,7 @@ while either menu is open. All games receive the same named actions and decide
 what those actions do; physical keys and controller buttons belong to the shared
 preset, not to individual games.
 
-Choose **Gameplay**, **Menus** or **System**. Each action has a visible
+Choose **Gameplay**, **Menus**, **System** or **Player 2**. Each action has a visible
 **Keyboard / Mouse** cell and a **Controller** cell. Assignments such as
 `W OR UP` show every control currently assigned to that device.
 
@@ -108,7 +120,7 @@ Choose **Gameplay**, **Menus** or **System**. Each action has a visible
   from the first row; Left/Right then changes categories.
 
 Changing a cell replaces the assignments shown in that cell and preserves the
-other device. For example, changing Keyboard Fire from Space to F leaves its
+other device. For example, changing Keyboard / Mouse Fire from left mouse to F leaves its
 controller buttons intact. Shared controls are allowed; identical assignments
 are reported after capture.
 
@@ -116,7 +128,10 @@ Edits update Quasar's keyboard and gamepad bindings and HUD labels immediately,
 and persist atomically to `data/config/shared/controls.toml` on normal exit.
 `--no-save` and explicit `--bindings` presets remain temporary. Existing valid
 presets are writable; corrupt/newer files are preserved. Old version-one presets
-receive the two newly named catalog stick axes when those entries are missing.
+receive missing catalog axes, imported-game movement, jump and player-two actions.
+Version-one default bindings migrate to Space for jump and left mouse for fire;
+custom remaps and controller assignments are preserved.
+Existing assignments and explicitly disabled actions are preserved.
 
 Escape always provides access to Settings; arrow keys and Enter remain recovery
 navigation inside Settings. These fixed recovery controls prevent an empty or
@@ -174,10 +189,14 @@ Shared library code lives under `crates/`:
 | Crate | Responsibility |
 |---|---|
 | `classicclassics-core` | Game interface, input frames, sound events, HUD hints, drawing and simulation helpers |
-| `classicclassics-collection` | Game registration, catalog, settings, controls, persistence and generated audio |
+| `classicclassics-collection` | Game registration, catalog, settings, controls, persistence and Quasar audio |
 | `classicclassics-pong` | Pong simulation, rendering, records and catalog artwork |
 | `classicclassics-lunar` | Lunar Lander simulation, rendering, records and catalog artwork |
 | `classicclassics-asteroids` | Asteroids simulation, rendering, records and catalog artwork |
+| `classicclassics-micromages` | Imported Micro Mages campaign, sprites and collection adapter |
+| `classicclassics-jackal` | Imported Jackal campaign, sprites and collection adapter |
+| `classicclassics-missile-command` | Imported Missile Command simulation, pixels and collection adapter |
+| `classicclassics-river-raid` | Imported River Raid simulation, pixels and collection adapter |
 
 Every game depends on the core API and Quasar's headless draw lists; it does not
 know about the application, other games or filesystem persistence. Versions and
@@ -196,7 +215,7 @@ Nothing in the game loop is hand-rolled infrastructure:
 | `quasar-input` | Named actions, bindings, edge detection, deadzones, controller hotplug |
 | `quasar-ui` | Shared controls editor widgets, layout, focus and isolated rebinding |
 | `quasar-render-2d` | Ordered quad draw lists, bitmap font, GPU presentation, headless rasterisation |
-| `quasar-audio` | Deterministic generated clips and the optional CPAL output backend |
+| `quasar-audio` | Generated effects, original Ogg/WAV clips, music buses and optional CPAL output |
 | `quasar-storage` | Basalt directory discovery and atomic JSON persistence |
 | `quasar-config` | Common CLI/environment parsing (`--headless`, `--resolution`, `--no-audio`, …) |
 
@@ -207,13 +226,13 @@ separate renderer.
 
 ## Data and Basalt layout
 
-The release is a single binary plus artwork. On first run the game creates only
+The release is a single binary plus artwork and original game assets. On first run the game creates only
 the directories it needs and honors every Basalt directory variable, falling
 back to paths relative to the install root when run outside Basalt.
 
 ```text
 <install root>/
-├── app/                       release-owned: executable, cover, icon, license
+├── app/                       release-owned: executable, artwork, license, games/ assets
 └── data/
     ├── save/records.json      synced high scores and progress
     ├── config/display.toml    machine-local window/audio settings
@@ -270,6 +289,7 @@ python3 DevUtils/verify_package.py dist/ClassicClassics-*-linux-x64.zip
 - [Adding a game](docs/adding-a-game.md) — crate contract and registration
 - [Architecture](docs/architecture.md) — simulation, rendering, input and host boundaries
 - [Basalt compliance](docs/basalt-compliance.md) — the standard's checklist, item by item
+- [Imported games](docs/imported-games.md) — source provenance, adapters, controls and assets
 - [Testing](docs/testing.md) — deterministic, headless and native verification
 
 ## AGENTS
@@ -283,6 +303,7 @@ of truth for agent instructions.
   Register games in `classicclassics-collection/src/games.rs`; keep game crates
   independent of the collection and other games.
 - Keep every game a pure fixed-step simulation with a draw list. Headless tests must continue to run with `--no-default-features`.
+- Preserve imported simulations and assets; maintain them in this workspace. See `docs/imported-games.md` and each game’s `UPSTREAM.md`. Do not change the original repositories.
 - Never write to `app/` at runtime. Progress goes to `data/save/`, machine settings to `data/config/`, portable settings to `data/config/shared/`, rebuildable files to `data/cache/`.
 - Write JSON user data atomically through `quasar_storage`. TOML configuration
   uses the collection's `config_file` adapter because Quasar has no TOML writer.

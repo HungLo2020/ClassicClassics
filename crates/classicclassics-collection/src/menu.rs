@@ -3,7 +3,8 @@ use crate::VERSION;
 use crate::controls::ControlHints;
 use crate::games::{GameKind, Records};
 use crate::paint::{CYAN, DIM, GRID, MUTED, Paint, WHITE};
-use quasar_render_2d::Canvas;
+use crate::rendering::CatalogArt;
+use quasar_render_2d::{Canvas, Rect, Sprite};
 use std::ops::Range;
 
 pub const WIDTH: u32 = 1920;
@@ -58,7 +59,16 @@ pub fn navigate(selected: usize, input: crate::Input, count: usize) -> usize {
 }
 
 pub fn scene(selected: usize, records: &Records, hints: &ControlHints) -> Canvas {
-    catalog_scene(&GameKind::ALL, selected, records, hints)
+    catalog_scene(&GameKind::ALL, selected, records, hints, None)
+}
+
+pub fn scene_with_art(
+    selected: usize,
+    records: &Records,
+    hints: &ControlHints,
+    art: &CatalogArt,
+) -> Canvas {
+    catalog_scene(&GameKind::ALL, selected, records, hints, Some(art))
 }
 
 fn catalog_scene(
@@ -66,6 +76,7 @@ fn catalog_scene(
     selected: usize,
     records: &Records,
     hints: &ControlHints,
+    artwork: Option<&CatalogArt>,
 ) -> Canvas {
     let mut paint = Paint::new(WIDTH, HEIGHT);
     paint.background();
@@ -101,7 +112,15 @@ fn catalog_scene(
     for (slot, index) in visible.enumerate() {
         let x = LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP);
         let y = TOP + (slot / COLUMNS) as f32 * (CARD_HEIGHT + GAP);
-        card(&mut paint, x, y, games[index], index == selected, records);
+        card(
+            &mut paint,
+            x,
+            y,
+            games[index],
+            index == selected,
+            records,
+            artwork,
+        );
     }
     paint.rect(LEFT, 1000.0, 1760.0, 1.0, GRID);
     paint.text(
@@ -127,7 +146,15 @@ fn catalog_scene(
     paint.into_canvas()
 }
 
-fn card(paint: &mut Paint, x: f32, y: f32, kind: GameKind, selected: bool, records: &Records) {
+fn card(
+    paint: &mut Paint,
+    x: f32,
+    y: f32,
+    kind: GameKind,
+    selected: bool,
+    records: &Records,
+    artwork: Option<&CatalogArt>,
+) {
     let accent = kind.accent();
     if selected {
         paint.rect(
@@ -146,6 +173,49 @@ fn card(paint: &mut Paint, x: f32, y: f32, kind: GameKind, selected: bool, recor
         CARD_HEIGHT,
         if selected { accent } else { GRID },
     );
+    if let Some(texture) = artwork.and_then(|art| art.get(kind)) {
+        let mut sprite = Sprite::new(texture, Rect::new(x + 20.0, y + 20.0, 216.0, 288.0));
+        sprite.filter = Some(quasar_render_2d::Filter::Linear);
+        paint.sprite(sprite);
+        paint.text(x + 260.0, y + 22.0, kind.number(), 2.0, accent);
+        paint.text(x + 260.0, y + 59.0, &kind.name().to_uppercase(), 2.0, WHITE);
+        let mut line = String::new();
+        let mut row = 0;
+        for word in kind.tagline().split_whitespace() {
+            if line.len() + word.len() > 25 && !line.is_empty() {
+                paint.text(x + 260.0, y + 104.0 + row as f32 * 22.0, &line, 1.4, MUTED);
+                line.clear();
+                row += 1;
+            }
+            if !line.is_empty() {
+                line.push(' ');
+            }
+            line.push_str(word);
+        }
+        paint.text(x + 260.0, y + 104.0 + row as f32 * 22.0, &line, 1.4, MUTED);
+        let (label, value) = kind.catalog_record(records);
+        paint.text(x + 260.0, y + 222.0, label, 1.5, DIM);
+        paint.text(x + 260.0, y + 250.0, &value, 2.0, accent);
+        paint.text(
+            x + 260.0,
+            y + 287.0,
+            if selected { "READY" } else { "STANDBY" },
+            1.5,
+            accent,
+        );
+        paint.text(
+            x + 24.0,
+            y + 338.0,
+            if selected {
+                "PRESS CONFIRM TO PLAY"
+            } else {
+                "SELECT TO INSPECT"
+            },
+            1.0,
+            if selected { accent } else { DIM },
+        );
+        return;
+    }
     paint.text(x + 24.0, y + 20.0, kind.number(), 2.0, accent);
     paint.right(
         x + CARD_WIDTH - 24.0,
@@ -154,7 +224,7 @@ fn card(paint: &mut Paint, x: f32, y: f32, kind: GameKind, selected: bool, recor
         2.0,
         if selected { accent } else { DIM },
     );
-    paint.text(x + 24.0, y + 58.0, kind.name(), 3.0, WHITE);
+    paint.text(x + 24.0, y + 58.0, &kind.name().to_uppercase(), 3.0, WHITE);
     paint.text(x + 24.0, y + 92.0, kind.tagline(), 2.0, MUTED);
     paint.rect(x + 24.0, y + 124.0, CARD_WIDTH - 48.0, 1.0, GRID);
     paint.rect(
@@ -205,11 +275,18 @@ mod tests {
                 selected,
                 &Records::default(),
                 &ControlHints::default(),
+                None,
             );
             assert_eq!((canvas.width(), canvas.height()), (1920, 1080));
             canvas.validate(&Default::default()).unwrap();
         }
-        let canvas = catalog_scene(&games, 5, &Records::default(), &ControlHints::default());
+        let canvas = catalog_scene(
+            &games,
+            5,
+            &Records::default(),
+            &ControlHints::default(),
+            None,
+        );
         let pixels = quasar_render_2d::reference::rasterize(&canvas, &Default::default()).unwrap();
         for slot in 0..PAGE_SIZE {
             let x = (LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP)) as usize;

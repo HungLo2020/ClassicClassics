@@ -25,3 +25,7 @@ serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 toml.workspace = true
+classicclassics-micromages.workspace = true
+classicclassics-jackal.workspace = true
+classicclassics-missile-command.workspace = true
+classicclassics-river-raid.workspace = true

@@ -7,9 +7,13 @@ cargo test --locked --no-default-features
 ```
 
 This build excludes the window, GPU, gamepad and native audio backends. It runs
-the menu, all three simulations, vector draw-list validation, reference
+the menu, all seven simulations, vector/pixel draw-list validation, reference
 rasterisation, controls validation, CLI parsing and generated-audio tests. The
 suite covers:
+
+- imported upstream simulation, rendering, campaign and replay regression suites;
+- adapter/original state equivalence for movement, multiplayer, grenades and batteries;
+- imported clock cadence, buffered taps, pause/restart and original audio decoding;
 
 - deterministic autoplay for each game (finite state, scoring, collisions);
 - Pong serve/wall/paddle/score flow and mode switching;
@@ -48,6 +52,9 @@ cargo run --locked --no-default-features -- \
 cargo run --locked --no-default-features -- \
   --headless --game asteroids --settings --ticks 1 --screenshot /tmp/settings.png
 ```
+
+Additional game aliases are `micromages`, `jackal`, `missile-command` and
+`river-raid`. Use 6000 ticks to exercise setup and actual gameplay during autoplay.
 
 The catalog screenshot is 1920×1080; game screenshots remain 960×600.
 
@@ -127,7 +134,7 @@ python3 DevUtils/package.py
 python3 DevUtils/verify_package.py dist/ClassicClassics-*-linux-x64.zip
 ```
 
-The verifier checks the asset name, `app/`-only root, absence of user data,
+The verifier checks both imported sprite games’ complete asset trees, the asset name, `app/`-only root, absence of user data,
 required artwork/runtime files, the executable bit, the cover size and the
 catalog entry's schema, id, repository and launch path.
 
@@ -140,3 +147,29 @@ Ubuntu 24.04, including simulated release-tool tests. It never publishes.
 successful CI for the requested current main SHA, packages/verifies the ZIP and
 replaces the single `Latest` release. Use the project release skill to dispatch,
 watch and verify both the Actions artifact and the ZIP Basalt downloads.
+
+## Imported-game performance and artwork
+
+`rendering.rs` integration tests guard one-sprite pixel presentation, immutable
+frame reuse between video ticks, unchanged simulation snapshots, correct pixel
+colors/aspect, and complete Basalt covers on both catalog pages. Cover pixels are
+checked against independent source checksums in `docs/artwork-sources.json`.
+
+For repeatable CPU profiling after setup:
+
+```sh
+cargo run --locked --no-default-features --example profile_imports
+cargo run --locked --release --no-default-features --example profile_imports
+```
+
+For native frame pacing (use debug and release, with audio on and off):
+
+```sh
+cargo run --locked -- --game micromages --autoplay --no-save --no-audio --smoke-frames 1800
+cargo run --locked -- --game micromages --autoplay --no-save --set audio.volume=0.0 --smoke-frames 1800
+```
+
+Smoke runs report scene/presentation/interval p95 times, slow intervals, upload
+bytes and dynamic texture count. Statistics exclude the first third of frames;
+use enough frames to reach gameplay. A game frame should use one dynamic texture
+and a few dozen glyph/background quads. Repeat for the other three imports.

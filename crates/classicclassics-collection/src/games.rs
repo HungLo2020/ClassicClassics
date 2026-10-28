@@ -14,6 +14,9 @@ macro_rules! games {
             pub fn info(self) -> &'static GameInfo {
                 match self { $(Self::$variant => &$game::Game::INFO,)+ }
             }
+            pub fn cover(self) -> Option<&'static [u8]> {
+                match self { $(Self::$variant => $game::Game::COVER,)+ }
+            }
             pub fn name(self) -> &'static str { self.info().name }
             pub fn tagline(self) -> &'static str { self.info().tagline }
             pub fn accent(self) -> [u8; 4] { self.info().accent }
@@ -33,11 +36,11 @@ macro_rules! games {
 
         #[derive(Clone, Debug, Serialize, Deserialize)]
         #[serde(tag = "kind", content = "state", rename_all = "snake_case")]
-        pub enum Game { $($variant($game::Game),)+ }
+        pub enum Game { $($variant(Box<$game::Game>),)+ }
 
         impl Game {
             pub fn new(kind: GameKind) -> Self {
-                match kind { $(GameKind::$variant => Self::$variant($game::Game::default()),)+ }
+                match kind { $(GameKind::$variant => Self::$variant(Box::default()),)+ }
             }
             pub fn kind(&self) -> GameKind {
                 match self { $(Self::$variant(_) => GameKind::$variant,)+ }
@@ -45,8 +48,14 @@ macro_rules! games {
             pub fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
                 match self { $(Self::$variant(game) => game.tick(input, sounds),)+ }
             }
+            pub fn paused(&self) -> bool {
+                match self { $(Self::$variant(game) => game.paused(),)+ }
+            }
             pub fn autoplay(&self) -> Input {
                 match self { $(Self::$variant(game) => game.autoplay(),)+ }
+            }
+            pub fn pixel_frame(&self, hints: &ControlHints) -> Option<classicclassics_core::imported::PixelFrame> {
+                match self { $(Self::$variant(game) => game.pixel_frame(hints),)+ }
             }
             pub fn scene(&self, hints: &ControlHints) -> Canvas {
                 match self { $(Self::$variant(game) => game.scene(hints),)+ }
@@ -78,10 +87,19 @@ use classicclassics_asteroids as asteroids;
 use classicclassics_lunar as lunar;
 use classicclassics_pong as pong;
 
+use classicclassics_jackal as jackal;
+use classicclassics_micromages as micromages;
+use classicclassics_missile_command as missile;
+use classicclassics_river_raid as river;
+
 games! {
     Pong => pong, pong, "01";
     LunarLander => lunar, lunar, "02";
     Asteroids => asteroids, asteroids, "03";
+    MicroMages => micromages, micromages, "04";
+    Jackal => jackal, jackal, "05";
+    MissileCommand => missile, missile, "06";
+    RiverRaid => river, river, "07";
 }
 
 #[cfg(test)]
@@ -140,7 +158,10 @@ mod tests {
             "asteroids": { "best_score": 9000, "best_level": 6 }
         });
         let records: Records = serde_json::from_value(old.clone()).unwrap();
-        assert_eq!(serde_json::to_value(records).unwrap(), old);
+        let current = serde_json::to_value(records).unwrap();
+        for key in ["version", "pong", "lunar", "asteroids"] {
+            assert_eq!(current[key], old[key]);
+        }
         let partial: Records =
             serde_json::from_str(r#"{"version":1,"pong":{"best_rally":17}}"#).unwrap();
         assert_eq!(partial.pong.best_rally, 17);

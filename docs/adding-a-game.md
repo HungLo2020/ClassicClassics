@@ -85,7 +85,8 @@ then map the new named action in `src/desktop.rs`. Add any signed action to
 `controls_screen::axis_directions` so its editor captures a button pair or stick.
 Place each new action in the Gameplay, Menus or System list in `controls_screen.rs`;
 the editor checks that every action appears exactly once. Do not create a
-game-specific control editor or persistence file. New sound events go
+game-specific control editor or persistence file. Imported software renderers can use the documented compatibility adapter in
+[Imported games](imported-games.md) without changing their gameplay. New sound events go
 in core's `audio.rs`, with synthesis/playback in the collection's `audio.rs`.
 Preserve old portable binding presets or provide an explicit migration.
 
@@ -108,3 +109,17 @@ validation. Add game-specific simulation tests in its own crate and inspect its
 headless and native presentation before finishing. Packaging still emits one
 `app/bin/classicclassics` binary; adding a game does not require another launcher
 or a different Basalt catalog entry.
+
+## Pixel games and cover art
+
+An imported software renderer can implement `ArcadeGame::pixel_frame` and return a
+`PixelFrame` containing a cached Quasar `Image`, aspect ratio and help text. Keep
+`FrameCache` out of Serde snapshots and invalidate it only on original video ticks
+or changes affecting rendered pixels. `Session::render` routes the frame to the
+native dynamic-texture or headless CPU target. Never expand each pixel/run into
+geometry in the application host. Games still have no GPU/window/device handles.
+
+Set the optional `ArcadeGame::COVER` to embedded Basalt PNG bytes. The collection
+registers and caches these textures automatically and fits the complete portrait
+cover into its card. Preserve source credits and update the artwork provenance
+manifest when importing or changing a cover.

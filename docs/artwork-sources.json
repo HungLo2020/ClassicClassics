@@ -1,0 +1,30 @@
+{
+  "micromages": {
+    "source": "https://github.com/HungLo2020/MicroMages/blob/e28196066206f5cb93a988cfac13443effc51395/packaging/artwork/cover.png",
+    "source_sha256": "c31188e967394380b4307a57665bfd1bbf8dc9975236f90b5ff8fac66c935b84",
+    "rgba_fnv1a64": "c296d04e43f6d441",
+    "width": 900,
+    "height": 1200
+  },
+  "jackal": {
+    "source": "https://github.com/HungLo2020/Jackal/blob/4db82b130d1a44ee3789ff7bca1ccd52080cf329/packaging/artwork/cover.jpg",
+    "source_sha256": "107ff5c132201d0ac619fff7e1b3ac58d7ed76ae5c0fdfb03f78f5fddd31ea64",
+    "rgba_fnv1a64": "34bf8b328dad5b77",
+    "width": 900,
+    "height": 1200
+  },
+  "missile-command": {
+    "source": "https://github.com/HungLo2020/MissileCommand/blob/7c5fa23fe2db4725096e482af94308a308358e40/assets/cover.png",
+    "source_sha256": "1a0d668d34c3b99ab9ee113a672c50a987005b0108bea5740e13645bde92bc80",
+    "rgba_fnv1a64": "3951409db5288526",
+    "width": 900,
+    "height": 1200
+  },
+  "river-raid": {
+    "source": "https://github.com/HungLo2020/RiverRaid/blob/85eabf045459d1764adf7bbeb23651fd12f55c86/assets/cover.png",
+    "source_sha256": "215e83c05f22cdeed1c1a2b2d7519e2ca29d970ca9d906627158dda383168ca5",
+    "rgba_fnv1a64": "10d8425630fe301d",
+    "width": 900,
+    "height": 1200
+  }
+}

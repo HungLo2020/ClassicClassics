@@ -1,6 +1,6 @@
 # Architecture
 
-Classic Classics is a Cargo workspace with six crates and one executable.
+Classic Classics is a Cargo workspace with ten crates, including one executable.
 
 | Package | Location | Responsibility |
 |---|---|---|
@@ -10,6 +10,10 @@ Classic Classics is a Cargo workspace with six crates and one executable.
 | `classicclassics-pong` | `crates/classicclassics-pong/` | Pong and its record schema/catalog motif |
 | `classicclassics-lunar` | `crates/classicclassics-lunar/` | Lunar Lander and its record schema/catalog motif |
 | `classicclassics-asteroids` | `crates/classicclassics-asteroids/` | Asteroids and its record schema/catalog motif |
+| `classicclassics-micromages` | `crates/classicclassics-micromages/` | Original Micro Mages campaign, renderer and adapter |
+| `classicclassics-jackal` | `crates/classicclassics-jackal/` | Original Jackal campaign, renderer and adapter |
+| `classicclassics-missile-command` | `crates/classicclassics-missile-command/` | Original Missile Command simulation, renderer and adapter |
+| `classicclassics-river-raid` | `crates/classicclassics-river-raid/` | Original River Raid simulation, renderer and adapter |
 
 The dependency direction is host → collection → games → core. Each game depends
 only on core, Serde and Quasar's draw-list API. Games never depend on each other,
@@ -61,7 +65,7 @@ enters the simulation.
 
 ## Input
 
-`classicclassics-collection/src/controls.rs` declares twenty-three named actions. `quasar_input::Bindings` maps
+`classicclassics-collection/src/controls.rs` declares thirty named actions. `quasar_input::Bindings` maps
 keyboard, mouse and gamepad sources to them. The desktop host reads two
 `InputState`s: the window's keyboard/mouse state and the gamepad hub's player
 state, then merges the same action from both. Catalog stick axes also come from named
@@ -170,11 +174,13 @@ the GPU. Settings are written to `data/config/display.toml` on a normal exit.
 
 ## Audio
 
-`classicclassics-collection/src/audio.rs` synthesises every effect into a `quasar_audio::Clip` at startup. There
-are no audio files in the release. When the `audio` feature is enabled, a native
-`AudioEngine` is opened with a 48 kHz stereo request and an "effects" bus. A
-missing device is not fatal: `AudioEngine::try_open` returns `None` and the game
-continues silently. **M** mutes the bus and persists the preference.
+`classicclassics-collection/src/audio.rs` synthesises the collection's generated
+effects into Quasar clips. Micro Mages and Jackal retain original music/effect
+assets, prepared before the clock starts; Ogg music streams through Quasar decoder threads. Shared music and effects
+buses honor volume and mute; music pauses with Settings and stops at the catalog.
+A missing native output device is not fatal. Game crates only emit cue data.
+See [Imported games](imported-games.md) for the compatibility rendering adapter,
+original clock rates, source provenance and release asset locations.
 
 ## Persistence
 

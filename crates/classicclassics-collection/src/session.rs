@@ -77,6 +77,9 @@ impl Session {
             .position(|candidate| *candidate == kind)
             .unwrap_or(0);
         self.screen = Screen::Game(Game::new(kind));
+        self.sounds.push(Sound::Asset(
+            classicclassics_core::audio::AssetSound::StopMusic,
+        ));
         self.sounds.push(Sound::MenuSelect);
     }
 
@@ -118,6 +121,9 @@ impl Session {
                     }
                     self.screen = Screen::Menu;
                     self.settings_screen = None;
+                    self.sounds.push(Sound::Asset(
+                        classicclassics_core::audio::AssetSound::StopMusic,
+                    ));
                     self.sounds.push(Sound::MenuSelect);
                     return false;
                 }
@@ -146,6 +152,9 @@ impl Session {
                 if input.confirm {
                     let kind = GameKind::ALL[self.selected];
                     self.screen = Screen::Game(Game::new(kind));
+                    self.sounds.push(Sound::Asset(
+                        classicclassics_core::audio::AssetSound::StopMusic,
+                    ));
                     self.sounds.push(Sound::MenuSelect);
                 }
                 false
@@ -154,6 +163,9 @@ impl Session {
                 if input.back {
                     game.record(&mut self.records);
                     self.screen = Screen::Menu;
+                    self.sounds.push(Sound::Asset(
+                        classicclassics_core::audio::AssetSound::StopMusic,
+                    ));
                     self.sounds.push(Sound::MenuSelect);
                     return false;
                 }
@@ -161,6 +173,13 @@ impl Session {
                 game.record(&mut self.records);
                 false
             }
+        }
+    }
+
+    pub fn game_kind(&self) -> Option<GameKind> {
+        match &self.screen {
+            Screen::Menu => None,
+            Screen::Game(game) => Some(game.kind()),
         }
     }
 
@@ -177,6 +196,28 @@ impl Session {
             Screen::Menu => menu::scene(self.selected, &self.records, &hints),
             Screen::Game(game) => game.scene(&hints),
         };
+        self.overlay(base)
+    }
+
+    pub fn render(
+        &mut self,
+        target: &mut dyn crate::rendering::SceneTarget,
+    ) -> crate::Result<Canvas> {
+        let hints = self.controls.hints();
+        let base = match &self.screen {
+            Screen::Menu => {
+                menu::scene_with_art(self.selected, &self.records, &hints, target.artwork())
+            }
+            Screen::Game(game) => match game.pixel_frame(&hints) {
+                Some(frame) => frame.canvas(target.upload_frame(&frame)?),
+                None => game.scene(&hints),
+            },
+        };
+        Ok(self.overlay(base))
+    }
+
+    fn overlay(&mut self, base: Canvas) -> Canvas {
+        let hints = self.controls.hints();
         if let Some(screen) = &mut self.controls_screen {
             return screen.scene(base);
         }
@@ -338,7 +379,7 @@ mod tests {
             menu_left: true,
             ..Default::default()
         }));
-        assert_eq!(session.selected, 2);
+        assert_eq!(session.selected, GameKind::ALL.len() - 1);
         assert!(!session.tick(Input {
             menu_right: true,
             ..Default::default()

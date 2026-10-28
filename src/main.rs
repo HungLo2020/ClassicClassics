@@ -132,9 +132,9 @@ fn run_headless(options: &Options, session: &mut Session) -> classicclassics_col
         {
             std::fs::create_dir_all(parent)?;
         }
-        let textures = quasar_render_2d::Textures::default();
-        let canvas = session.scene();
-        let pixels = quasar_render_2d::reference::rasterize(&canvas, &textures)?;
+        let mut assets = classicclassics_collection::rendering::SceneAssets::new()?;
+        let canvas = session.render(&mut assets)?;
+        let pixels = quasar_render_2d::reference::rasterize(&canvas, &assets.textures)?;
         quasar_render_2d::write_png(path, canvas.width(), canvas.height(), &pixels)?;
     }
     if let Some(path) = &options.state {

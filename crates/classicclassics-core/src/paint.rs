@@ -59,6 +59,10 @@ impl Paint {
         self.canvas.set_transform(self.transform);
     }
 
+    pub fn sprite(&mut self, sprite: quasar_render_2d::Sprite) {
+        self.canvas.sprite(sprite);
+    }
+
     pub fn canvas(&self) -> &Canvas {
         &self.canvas
     }

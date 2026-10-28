@@ -19,7 +19,7 @@ quasar-input = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
 quasar-render-2d = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["png"] }
 quasar-storage = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
 quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 tempfile = "3"
 toml = "0.9"
@@ -28,6 +28,14 @@ classicclassics-collection = { path = "crates/classicclassics-collection", defau
 classicclassics-pong = { path = "crates/classicclassics-pong" }
 classicclassics-lunar = { path = "crates/classicclassics-lunar" }
 classicclassics-asteroids = { path = "crates/classicclassics-asteroids" }
+
+classicclassics-micromages = { path = "crates/classicclassics-micromages" }
+
+classicclassics-jackal = { path = "crates/classicclassics-jackal" }
+
+classicclassics-missile-command = { path = "crates/classicclassics-missile-command" }
+
+classicclassics-river-raid = { path = "crates/classicclassics-river-raid" }
 
 [package]
 name = "classicclassics"
@@ -63,3 +71,30 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 strip = "symbols"
+
+[[example]]
+name = "profile_imports"
+path = "DevUtils/profile_imports.rs"
+
+# The imported CPU renderers need the same optimized development behavior as
+# their original applications. Keep host code debuggable without slow pixel loops.
+[profile.dev.package.classicclassics-micromages]
+opt-level = 1
+[profile.dev.package.classicclassics-jackal]
+opt-level = 1
+[profile.dev.package.classicclassics-missile-command]
+opt-level = 1
+[profile.dev.package.classicclassics-river-raid]
+opt-level = 1
+[profile.dev.package.classicclassics-core]
+opt-level = 1
+# Real-time callbacks and asset codecs also need optimization in cargo run.
+# In particular, decoding the imported WAV/PNG assets unoptimized is very slow.
+[profile.dev.package.quasar-audio]
+opt-level = 1
+[profile.dev.package.quasar-render-2d]
+opt-level = 1
+[profile.dev.package.image]
+opt-level = 1
+[profile.dev.package.png]
+opt-level = 1

@@ -36,6 +36,15 @@ def version() -> str:
     return next(package["version"] for package in metadata["packages"] if package["name"] == "classicclassics")
 
 
+def game_assets():
+    """Source assets mapped into the release-owned app tree."""
+    for game in ("micromages", "jackal"):
+        root = ROOT / "crates" / f"classicclassics-{game}" / "assets"
+        for path in sorted(root.rglob("*")):
+            if path.is_file():
+                yield path, f"app/games/{game}/{path.relative_to(root).as_posix()}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, help="package an existing native desktop build")
@@ -69,6 +78,8 @@ def main() -> None:
         output.write(ROOT / "app/basalt/cover.png", "app/basalt/cover.png")
         output.write(ROOT / "app/basalt/icon.png", "app/basalt/icon.png")
         output.write(ROOT / "LICENSE", "app/LICENSE")
+        for path, destination in game_assets():
+            output.write(path, destination)
         output.writestr(
             "app/CLASSICCLASSICS-RUNTIME.txt",
             RUNTIME.format(version=package_version),

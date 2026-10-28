@@ -17,14 +17,20 @@ const TABLE_TOP: f32 = 70.0;
 const ROW_HEIGHT: f32 = 31.0;
 const GAMEPLAY: &[&str] = &[
     controls::FIRE,
+    controls::JUMP,
+    controls::MOVE_HORIZONTAL,
+    controls::MOVE_VERTICAL,
     controls::THRUST,
     controls::ROTATE,
     controls::P1,
-    controls::P2,
     controls::HYPERSPACE,
-    controls::PAUSE,
-    controls::RESTART,
-    controls::MODE,
+];
+const LOCAL_PLAYERS: &[&str] = &[
+    controls::P2_HORIZONTAL,
+    controls::P2,
+    controls::P2_FIRE,
+    controls::P2_JUMP,
+    controls::P2_SECONDARY,
 ];
 const MENUS: &[&str] = &[
     controls::MENU_UP,
@@ -38,24 +44,45 @@ const MENUS: &[&str] = &[
     controls::MENU_VERTICAL,
 ];
 const SYSTEM: &[&str] = &[
+    controls::PAUSE,
+    controls::RESTART,
+    controls::MODE,
     controls::FULLSCREEN,
     controls::FILTER,
     controls::SCALE,
     controls::MUTE,
     controls::QUIT,
 ];
-const GROUPS: [(&str, &[&str]); 3] = [("GAMEPLAY", GAMEPLAY), ("MENUS", MENUS), ("SYSTEM", SYSTEM)];
+const GROUPS: [(&str, &[&str]); 4] = [
+    ("GAMEPLAY", GAMEPLAY),
+    ("MENUS", MENUS),
+    ("SYSTEM", SYSTEM),
+    ("PLAYER 2", LOCAL_PLAYERS),
+];
 
 pub fn axis_directions(action: &str) -> Option<(&'static str, &'static str)> {
     match action {
-        controls::P1 | controls::P2 | controls::MENU_VERTICAL => Some(("UP", "DOWN")),
-        controls::ROTATE | controls::MENU_HORIZONTAL => Some(("LEFT", "RIGHT")),
+        controls::P1 | controls::P2 | controls::MENU_VERTICAL | controls::MOVE_VERTICAL => {
+            Some(("UP", "DOWN"))
+        }
+        controls::ROTATE
+        | controls::MENU_HORIZONTAL
+        | controls::P2_HORIZONTAL
+        | controls::MOVE_HORIZONTAL => Some(("LEFT", "RIGHT")),
         _ => None,
     }
 }
 
 pub fn action_label(action: &str) -> String {
     match action {
+        controls::MOVE_HORIZONTAL => "MOVE LEFT / RIGHT",
+        controls::MOVE_VERTICAL => "MOVE UP / DOWN",
+        controls::JUMP => "JUMP / RIGHT BATTERY",
+        controls::P2_HORIZONTAL => "PLAYER 2 LEFT / RIGHT",
+        controls::P2_FIRE => "PLAYER 2 FIRE",
+        controls::P2_JUMP => "PLAYER 2 JUMP",
+        controls::P2_SECONDARY => "PLAYER 2 GRENADE",
+        controls::HYPERSPACE => "SECONDARY / LEFT BASE",
         controls::FIRE => "FIRE / SERVE",
         controls::ROTATE => "TURN LEFT / RIGHT",
         controls::P1 => "PADDLE 1 UP / DOWN",
@@ -138,9 +165,16 @@ fn button_name(button: Button) -> String {
 fn binding_name(binding: &Binding) -> String {
     match binding {
         Binding::Button { button } => button_name(*button),
-        Binding::Axis { negative, positive } => {
-            format!("{} / {}", button_name(*negative), button_name(*positive))
-        }
+        Binding::Axis { negative, positive } => match (negative, positive) {
+            (
+                Button::Gamepad(GamepadButton::DPadLeft),
+                Button::Gamepad(GamepadButton::DPadRight),
+            ) => "D-PAD L/R".into(),
+            (Button::Gamepad(GamepadButton::DPadUp), Button::Gamepad(GamepadButton::DPadDown)) => {
+                "D-PAD U/D".into()
+            }
+            _ => format!("{} / {}", button_name(*negative), button_name(*positive)),
+        },
         Binding::Chord { buttons } => buttons
             .iter()
             .map(|button| button_name(*button))
@@ -819,7 +853,7 @@ mod tests {
         let controls = Controls::default();
         assert_eq!(
             cell_value(&controls, controls::FIRE, Device::Keyboard),
-            "SPACE"
+            "LEFT MOUSE"
         );
         assert_eq!(
             cell_value(&controls, controls::FIRE, Device::Controller),
@@ -903,7 +937,7 @@ mod tests {
         );
         assert_eq!(
             cell_value(&controls, controls::FIRE, Device::Keyboard),
-            "SPACE"
+            "LEFT MOUSE"
         );
         assert_eq!(
             cell_value(&controls, controls::FIRE, Device::Controller),
@@ -1119,6 +1153,8 @@ mod tests {
                 let canvas = screen.scene(Canvas::new(width, height).unwrap());
                 canvas.validate(&Default::default()).unwrap();
                 assert_eq!(screen.cells.len(), actions.len() * 2);
+                // The rows must finish above the selected-value/help footer.
+                assert!(100.0 + TABLE_TOP + actions.len() as f32 * ROW_HEIGHT <= 462.0);
                 for entry in screen.ui.layout_entries() {
                     assert!(
                         entry.rect.x >= 0.0

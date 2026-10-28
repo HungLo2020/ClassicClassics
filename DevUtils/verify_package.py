@@ -36,6 +36,11 @@ def verify(archive: Path, version: str) -> list[str]:
             "app/basalt/icon.png",
             "app/CLASSICCLASSICS-RUNTIME.txt",
         }
+        # Both sprite games need their complete exported asset trees at runtime.
+        for game in ("micromages", "jackal"):
+            root = ROOT / "crates" / f"classicclassics-{game}" / "assets"
+            required.update(f"app/games/{game}/{path.relative_to(root).as_posix()}"
+                            for path in root.rglob("*") if path.is_file())
         missing = sorted(required - set(names))
         if missing:
             errors.append(f"missing release files: {', '.join(missing)}")

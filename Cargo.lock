@@ -207,6 +207,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
+name = "byteorder-lite"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
+
+[[package]]
 name = "bytes"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -318,8 +324,12 @@ version = "1.0.0"
 dependencies = [
  "classicclassics-asteroids",
  "classicclassics-core",
+ "classicclassics-jackal",
  "classicclassics-lunar",
+ "classicclassics-micromages",
+ "classicclassics-missile-command",
  "classicclassics-pong",
+ "classicclassics-river-raid",
  "quasar-audio",
  "quasar-config",
  "quasar-input",
@@ -341,6 +351,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "classicclassics-jackal"
+version = "1.0.0"
+dependencies = [
+ "classicclassics-core",
+ "image",
+ "quasar-render-2d",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "classicclassics-lunar"
 version = "1.0.0"
 dependencies = [
@@ -350,12 +371,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "classicclassics-micromages"
+version = "1.0.0"
+dependencies = [
+ "classicclassics-core",
+ "png 0.17.16",
+ "quasar-render-2d",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "classicclassics-missile-command"
+version = "1.0.0"
+dependencies = [
+ "classicclassics-core",
+ "quasar-render-2d",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "classicclassics-pong"
 version = "1.0.0"
 dependencies = [
  "classicclassics-core",
  "quasar-render-2d",
  "serde",
+]
+
+[[package]]
+name = "classicclassics-river-raid"
+version = "1.0.0"
+dependencies = [
+ "classicclassics-core",
+ "quasar-render-2d",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -765,6 +817,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62adaabb884c94955b19907d60019f4e145d091c75345379e70d1ee696f7854f"
 
 [[package]]
+name = "image"
+version = "0.25.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
+dependencies = [
+ "bytemuck",
+ "byteorder-lite",
+ "moxcms",
+ "num-traits",
+ "png 0.18.1",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1037,6 +1102,16 @@ checksum = "b63fbc4a50860e98e7b2aa7804ded1db5cbc3aff9193adaff57a6931bf7c4b4c"
 dependencies = [
  "adler2",
  "simd-adler32",
+]
+
+[[package]]
+name = "moxcms"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b"
+dependencies = [
+ "num-traits",
+ "pxfm",
 ]
 
 [[package]]
@@ -1503,6 +1578,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "png"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60769b8b31b2a9f263dae2776c37b1b28ae246943cf719eb6946a1db05128a61"
+dependencies = [
+ "bitflags 2.13.2",
+ "crc32fast",
+ "fdeflate",
+ "flate2",
+ "miniz_oxide 0.8.9",
+]
+
+[[package]]
 name = "polling"
 version = "3.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1533,6 +1621,12 @@ checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "pxfm"
+version = "0.1.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "quasar-audio"
@@ -1582,7 +1676,7 @@ name = "quasar-render-2d"
 version = "0.2.16"
 source = "git+https://github.com/HungLo2020/Quasar?tag=v0.2.16#038e6e17b695d20cac1478f4a0f76607cc1c6c90"
 dependencies = [
- "png",
+ "png 0.17.16",
  "quasar-core",
  "quasar-frame",
  "raw-window-handle",

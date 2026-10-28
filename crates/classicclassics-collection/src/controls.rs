@@ -13,10 +13,17 @@ pub const MENU_RIGHT: &str = "menu_right";
 pub const CONFIRM: &str = "confirm";
 pub const BACK: &str = "back";
 pub const SETTINGS: &str = "settings";
+pub const MOVE_HORIZONTAL: &str = "move_horizontal";
+pub const MOVE_VERTICAL: &str = "move_vertical";
 pub const P1: &str = "p1";
 pub const P2: &str = "p2";
 pub const ROTATE: &str = "rotate";
 pub const THRUST: &str = "thrust";
+pub const JUMP: &str = "jump";
+pub const P2_HORIZONTAL: &str = "p2_horizontal";
+pub const P2_FIRE: &str = "p2_fire";
+pub const P2_JUMP: &str = "p2_jump";
+pub const P2_SECONDARY: &str = "p2_secondary";
 pub const FIRE: &str = "fire";
 pub const HYPERSPACE: &str = "hyperspace";
 pub const PAUSE: &str = "pause";
@@ -31,7 +38,7 @@ pub const SCALE: &str = "scale";
 pub const MENU_HORIZONTAL: &str = "menu_horizontal";
 pub const MENU_VERTICAL: &str = "menu_vertical";
 
-pub const ACTIONS: [&str; 23] = [
+pub const ACTIONS: [&str; 30] = [
     MENU_UP,
     MENU_DOWN,
     MENU_LEFT,
@@ -44,6 +51,13 @@ pub const ACTIONS: [&str; 23] = [
     ROTATE,
     THRUST,
     FIRE,
+    JUMP,
+    MOVE_HORIZONTAL,
+    MOVE_VERTICAL,
+    P2_HORIZONTAL,
+    P2_FIRE,
+    P2_JUMP,
+    P2_SECONDARY,
     HYPERSPACE,
     PAUSE,
     RESTART,
@@ -70,6 +84,45 @@ impl Default for Controls {
     fn default() -> Self {
         let mut bindings = Bindings::default();
         bindings
+            .bind(MOVE_HORIZONTAL, Binding::axis(Key::KeyA, Key::KeyD))
+            .bind(MOVE_VERTICAL, Binding::axis(Key::KeyW, Key::KeyS))
+            .bind(
+                MOVE_HORIZONTAL,
+                Binding::gamepad_axis(GamepadAxis::LeftStickX),
+            )
+            .bind(
+                MOVE_VERTICAL,
+                Binding::gamepad_axis(GamepadAxis::LeftStickY),
+            )
+            .bind(
+                MOVE_HORIZONTAL,
+                Binding::Axis {
+                    negative: Button::Gamepad(GamepadButton::DPadLeft),
+                    positive: Button::Gamepad(GamepadButton::DPadRight),
+                },
+            )
+            .bind(
+                MOVE_VERTICAL,
+                Binding::Axis {
+                    negative: Button::Gamepad(GamepadButton::DPadUp),
+                    positive: Button::Gamepad(GamepadButton::DPadDown),
+                },
+            )
+            .bind(JUMP, Binding::key(Key::Space))
+            .bind(
+                JUMP,
+                Binding::Button {
+                    button: Button::Mouse(MouseButton::Middle),
+                },
+            )
+            .bind(JUMP, Binding::gamepad_button(GamepadButton::North))
+            .bind(
+                P2_HORIZONTAL,
+                Binding::axis(Key::ArrowLeft, Key::ArrowRight),
+            )
+            .bind(P2_FIRE, Binding::key(Key::Numpad0))
+            .bind(P2_JUMP, Binding::key(Key::Numpad1))
+            .bind(P2_SECONDARY, Binding::key(Key::Numpad2))
             .bind(MENU_UP, Binding::key(Key::KeyW))
             .bind(MENU_UP, Binding::key(Key::ArrowUp))
             .bind(MENU_UP, Binding::gamepad_button(GamepadButton::DPadUp))
@@ -104,10 +157,21 @@ impl Default for Controls {
             .bind(THRUST, Binding::key(Key::ArrowUp))
             .bind(THRUST, Binding::gamepad_button(GamepadButton::LeftTrigger))
             .bind(THRUST, Binding::gamepad_button(GamepadButton::RightTrigger))
-            .bind(FIRE, Binding::key(Key::Space))
+            .bind(
+                FIRE,
+                Binding::Button {
+                    button: Button::Mouse(MouseButton::Left),
+                },
+            )
             .bind(FIRE, Binding::gamepad_button(GamepadButton::South))
             .bind(FIRE, Binding::gamepad_button(GamepadButton::RightTrigger))
             .bind(HYPERSPACE, Binding::key(Key::ShiftLeft))
+            .bind(
+                HYPERSPACE,
+                Binding::Button {
+                    button: Button::Mouse(MouseButton::Right),
+                },
+            )
             .bind(HYPERSPACE, Binding::key(Key::ShiftRight))
             .bind(HYPERSPACE, Binding::gamepad_button(GamepadButton::West))
             .bind(PAUSE, Binding::key(Key::KeyP))
@@ -132,7 +196,7 @@ impl Default for Controls {
                 Binding::gamepad_axis(GamepadAxis::LeftStickY),
             );
         Self {
-            version: 1,
+            version: 2,
             bindings,
         }
     }
@@ -140,7 +204,7 @@ impl Default for Controls {
 
 impl Controls {
     pub fn validate(&self) -> Result {
-        if self.version != 1 {
+        if self.version != 2 {
             return Err("unsupported controls version".into());
         }
         self.bindings.validate()?;
@@ -162,9 +226,54 @@ impl Controls {
 
     pub fn load(path: &Path) -> Result<Self> {
         let mut controls: Self = quasar_config::load_file_typed(path)?;
-        // Older version-one presets predate configurable catalog stick axes.
+        // Upgrade only the shipped keyboard/mouse defaults; retain custom remaps
+        // and controller assignments, including explicitly disabled actions.
+        if controls.version == 1 {
+            for (action, key, mouse) in [
+                (FIRE, Key::Space, MouseButton::Left),
+                (JUMP, Key::KeyZ, MouseButton::Middle),
+            ] {
+                if let Some(values) = controls.bindings.actions.get_mut(action) {
+                    let old: Vec<_> = values
+                        .iter()
+                        .filter(|value| keyboard_mouse(value))
+                        .cloned()
+                        .collect();
+                    let legacy_key = Binding::key(key);
+                    let legacy_mouse = Binding::Button {
+                        button: Button::Mouse(mouse),
+                    };
+                    if old == [legacy_key.clone()] || old == [legacy_key, legacy_mouse] {
+                        let mut updated: Vec<_> = Self::default().bindings.actions[action]
+                            .iter()
+                            .filter(|value| keyboard_mouse(value))
+                            .cloned()
+                            .collect();
+                        updated.extend(
+                            values
+                                .iter()
+                                .filter(|value| !keyboard_mouse(value))
+                                .cloned(),
+                        );
+                        *values = updated;
+                    }
+                }
+            }
+            controls.version = 2;
+        }
+        // Older presets predate configurable catalog stick axes.
         let defaults = Self::default();
-        for name in [MENU_HORIZONTAL, MENU_VERTICAL] {
+        for name in [
+            MENU_HORIZONTAL,
+            MENU_VERTICAL,
+            MOVE_HORIZONTAL,
+            MOVE_VERTICAL,
+            JUMP,
+            P2_HORIZONTAL,
+            P2_FIRE,
+            P2_JUMP,
+            P2_SECONDARY,
+        ] {
             controls
                 .bindings
                 .actions
@@ -253,10 +362,13 @@ impl Controls {
             settings: label(SETTINGS),
             menu_left: label(MENU_LEFT),
             p1: label(P1),
+            move_x: label(MOVE_HORIZONTAL),
+            move_y: label(MOVE_VERTICAL),
             p2: label(P2),
             rotate: label(ROTATE),
             thrust: label(THRUST),
             fire: label(FIRE),
+            jump: label(JUMP),
             hyperspace: label(HYPERSPACE),
             pause: label(PAUSE),
             restart: label(RESTART),
@@ -290,6 +402,16 @@ pub fn binding_label(binding: &Binding) -> String {
                 format!("{label}*{scale}")
             }
         }
+    }
+}
+
+fn keyboard_mouse(binding: &Binding) -> bool {
+    let matches = |button: &Button| matches!(button, Button::Key(_) | Button::Mouse(_));
+    match binding {
+        Binding::Button { button } => matches(button),
+        Binding::Axis { negative, positive } => matches(negative) || matches(positive),
+        Binding::Chord { buttons } => buttons.iter().any(matches),
+        Binding::GamepadAxis { .. } => false,
     }
 }
 
@@ -406,13 +528,71 @@ mod tests {
     }
 
     #[test]
+    fn version_one_defaults_upgrade_without_changing_controller_remaps() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("controls.toml");
+        let mut old = Controls {
+            version: 1,
+            ..Default::default()
+        };
+        for (action, key, mouse) in [
+            (FIRE, Key::Space, MouseButton::Left),
+            (JUMP, Key::KeyZ, MouseButton::Middle),
+        ] {
+            old.bindings.actions.insert(
+                action.into(),
+                vec![
+                    Binding::key(key),
+                    Binding::Button {
+                        button: Button::Mouse(mouse),
+                    },
+                    Binding::gamepad_button(GamepadButton::West),
+                ],
+            );
+        }
+        crate::config_file::write(&path, &old).unwrap();
+        let loaded = Controls::load(&path).unwrap();
+        assert_eq!(loaded.version, 2);
+        assert_eq!(loaded.hints().jump, "SPACE");
+        assert_eq!(loaded.hints().fire, "MOUSE1");
+        for action in [FIRE, JUMP] {
+            assert_eq!(
+                loaded.bindings.actions[action].last(),
+                Some(&Binding::gamepad_button(GamepadButton::West))
+            );
+        }
+        assert_eq!(Controls::load(&path).unwrap(), loaded);
+        assert_eq!(
+            quasar_config::load_file_typed::<Controls>(&path).unwrap(),
+            old
+        );
+    }
+
+    #[test]
+    fn version_one_custom_and_disabled_controls_are_preserved() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("controls.toml");
+        let mut old = Controls {
+            version: 1,
+            ..Default::default()
+        };
+        old.bindings
+            .actions
+            .insert(FIRE.into(), vec![Binding::key(Key::KeyF)]);
+        old.bindings.actions.insert(JUMP.into(), vec![]);
+        crate::config_file::write(&path, &old).unwrap();
+        let loaded = Controls::load(&path).unwrap();
+        assert_eq!(loaded.bindings, old.bindings);
+    }
+
+    #[test]
     fn missing_unknown_and_unsupported_actions_are_rejected() {
         let mut controls = Controls {
-            version: 2,
+            version: 99,
             ..Default::default()
         };
         assert!(controls.validate().is_err());
-        controls.version = 1;
+        controls.version = 2;
         controls.bindings.actions.remove(FIRE);
         assert!(controls.validate().is_err());
         controls.bindings.actions.insert(FIRE.into(), vec![]);

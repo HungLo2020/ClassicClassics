@@ -3,6 +3,7 @@
 //! This crate has no window, filesystem, controller backend or audio device.
 pub mod audio;
 pub mod controls;
+pub mod imported;
 pub mod input;
 pub mod paint;
 pub mod simulation;
@@ -31,7 +32,14 @@ pub struct GameInfo {
 pub trait ArcadeGame: Default + Clone + std::fmt::Debug + Serialize + DeserializeOwned {
     type Record: Default + Clone + std::fmt::Debug + Serialize + DeserializeOwned;
     const INFO: GameInfo;
+    const COVER: Option<&'static [u8]> = None;
+    fn pixel_frame(&self, _hints: &ControlHints) -> Option<imported::PixelFrame> {
+        None
+    }
 
+    fn paused(&self) -> bool {
+        false
+    }
     fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>);
     fn autoplay(&self) -> Input;
     fn scene(&self, hints: &ControlHints) -> Canvas;

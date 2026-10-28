@@ -5,6 +5,7 @@ use classicclassics_collection::audio::{Audio, SoundBank};
 use classicclassics_collection::cli::Options;
 use classicclassics_collection::controls::{self, Controls};
 use classicclassics_collection::controls_screen::{CaptureEvent, ControlsScreen};
+use classicclassics_collection::rendering::{CatalogArt, SceneAssets, SceneTarget};
 use classicclassics_collection::settings::Settings;
 use classicclassics_collection::{Input, Session, TICK_HZ};
 use quasar_core::FixedStep;
@@ -15,7 +16,8 @@ use quasar_input::{
     MouseButton, PlayerId,
 };
 use quasar_render_2d::{
-    DisplayOptions, Filter, PresentOutcome, Renderer2D, Scaling, Textures, Viewport,
+    DisplayOptions, DynamicTexture, Filter, Image, PresentOutcome, Renderer2D, Scaling, TextureId,
+    Viewport,
 };
 use quasar_storage::GamePaths;
 use quasar_window::{
@@ -56,9 +58,12 @@ pub fn run(
     if let Some(audio) = &mut audio {
         audio.set_muted(settings.muted);
     }
+    let profile = options.smoke_frames.map(|_| NativeProfile::default());
     let mut app = App {
         presenter: None,
-        textures: Textures::default(),
+        assets: SceneAssets::new()?,
+        pixel_texture: None,
+        profile,
         window: None,
         options,
         session,
@@ -78,6 +83,7 @@ pub fn run(
         gamepads,
         stick: StickNav::default(),
         was_capturing: false,
+        last_game_pointer: None,
         capture_axes: [false; 6],
         fullscreen_request: None,
         size_request: None,
@@ -105,7 +111,9 @@ impl Gamepads {
     fn new(bindings: Bindings) -> Self {
         let player = PlayerId::new(0);
         let mut hub = GamepadHub::new();
-        let _ = hub.add_player_with_bindings(player, bindings.clone());
+        for slot in 0..4 {
+            let _ = hub.add_player_with_bindings(PlayerId::new(slot), bindings.clone());
+        }
         let mut fallback = InputState::default();
         let _ = fallback.set_bindings(bindings);
         #[cfg(feature = "gamepad")]
@@ -127,8 +135,8 @@ impl Gamepads {
 
     fn set_bindings(&mut self, bindings: Bindings) -> classicclassics_collection::Result {
         self.fallback.set_bindings(bindings.clone())?;
-        if let Some(player) = self.hub.player_mut(self.player) {
-            player.input.set_bindings(bindings)?;
+        for player in self.hub.players_mut() {
+            player.input.set_bindings(bindings.clone())?;
         }
         Ok(())
     }
@@ -137,6 +145,23 @@ impl Gamepads {
         #[cfg(feature = "gamepad")]
         if let Some(backend) = &mut self.backend {
             let _ = backend.poll(&mut self.hub);
+        }
+        let assigned: Vec<_> = (0..4)
+            .filter_map(|slot| self.hub.assignment(PlayerId::new(slot)))
+            .collect();
+        let unassigned: Vec<_> = self
+            .hub
+            .devices()
+            .iter()
+            .map(|device| device.id)
+            .filter(|id| !assigned.contains(id))
+            .collect();
+        for device in unassigned {
+            if let Some(slot) =
+                (0..4).find(|slot| self.hub.assignment(PlayerId::new(*slot)).is_none())
+            {
+                let _ = self.hub.assign(PlayerId::new(slot), device);
+            }
         }
     }
 
@@ -148,19 +173,17 @@ impl Gamepads {
     }
 
     fn consume_edges(&mut self) {
-        if let Some(player) = self.hub.player_mut(self.player) {
+        for player in self.hub.players_mut() {
             player.input.consume_edges();
-        } else {
-            self.fallback.consume_edges();
         }
+        self.fallback.consume_edges();
     }
 
     fn release_all(&mut self) {
-        if let Some(player) = self.hub.player_mut(self.player) {
+        for player in self.hub.players_mut() {
             player.release_all();
-        } else {
-            self.fallback.release_all();
         }
+        self.fallback.release_all();
     }
 }
 
@@ -253,10 +276,18 @@ fn build_input(keyboard: &InputState, gamepad: &InputState, stick: &mut StickNav
         confirm: confirm.pressed,
         back: back.pressed,
         settings: settings.pressed || keyboard.pressed(Key::Escape),
+        move_x: axis(merged_action(keyboard, gamepad, controls::MOVE_HORIZONTAL).value),
+        move_y: axis(merged_action(keyboard, gamepad, controls::MOVE_VERTICAL).value),
         p1: axis(merged_action(keyboard, gamepad, controls::P1).value),
         p2: axis(merged_action(keyboard, gamepad, controls::P2).value),
         rotate: axis(merged_action(keyboard, gamepad, controls::ROTATE).value),
         thrust: merged_action(keyboard, gamepad, controls::THRUST).held(),
+        jump: merged_action(keyboard, gamepad, controls::JUMP).held(),
+        jump_pressed: merged_action(keyboard, gamepad, controls::JUMP).pressed,
+        secondary: merged_action(keyboard, gamepad, controls::HYPERSPACE).held(),
+        secondary_pressed: merged_action(keyboard, gamepad, controls::HYPERSPACE).pressed,
+        other_players: [Default::default(); 3],
+        pointer: None,
         fire: fire.held(),
         fire_pressed: fire.pressed,
         hyperspace: merged_action(keyboard, gamepad, controls::HYPERSPACE).pressed,
@@ -329,10 +360,101 @@ fn gamepad_capture(
     events
 }
 
+#[derive(Default)]
+struct NativeProfile {
+    frames: Vec<[f64; 5]>,
+    last: Option<Instant>,
+}
+impl NativeProfile {
+    fn record(&mut self, scene: Duration, present: Duration, stats: quasar_render_2d::RenderStats) {
+        let now = Instant::now();
+        let interval = self
+            .last
+            .map_or(0.0, |last| (now - last).as_secs_f64() * 1000.0);
+        self.last = Some(now);
+        self.frames.push([
+            scene.as_secs_f64() * 1000.0,
+            present.as_secs_f64() * 1000.0,
+            interval,
+            stats.geometry_upload_bytes as f64,
+            stats.texture_upload_bytes as f64,
+        ]);
+    }
+    fn report(&self) {
+        if self.frames.is_empty() {
+            return;
+        }
+        // Exclude startup/setup from steady-state frame timing.
+        let frames = &self.frames[self.frames.len() / 3..];
+        let percentile = |column: usize| {
+            let mut values: Vec<_> = frames.iter().map(|frame| frame[column]).collect();
+            values.sort_by(f64::total_cmp);
+            values[values.len() * 95 / 100]
+        };
+        let mean = |column: usize| {
+            frames.iter().map(|frame| frame[column]).sum::<f64>() / frames.len() as f64
+        };
+        println!(
+            "native_profile samples={} scene_p95_ms={:.3} scene_max_ms={:.3} present_p95_ms={:.3} interval_p95_ms={:.3} intervals_over_25ms={} mean_geometry_bytes={:.0} mean_texture_bytes={:.0}",
+            frames.len(),
+            percentile(0),
+            frames.iter().map(|v| v[0]).fold(0.0, f64::max),
+            percentile(1),
+            percentile(2),
+            frames.iter().filter(|v| v[2] > 25.0).count(),
+            mean(3),
+            mean(4)
+        );
+    }
+}
+
+struct GpuSceneTarget<'a> {
+    renderer: &'a mut Renderer2D,
+    assets: &'a mut SceneAssets,
+    pixel: &'a mut Option<(DynamicTexture, Image)>,
+}
+impl SceneTarget for GpuSceneTarget<'_> {
+    fn artwork(&self) -> &CatalogArt {
+        &self.assets.artwork
+    }
+    fn upload_frame(
+        &mut self,
+        frame: &classicclassics_collection::rendering::PixelFrame,
+    ) -> classicclassics_collection::Result<TextureId> {
+        let size = (frame.image.width(), frame.image.height());
+        if self
+            .pixel
+            .as_ref()
+            .is_some_and(|(texture, _)| texture.size() != size)
+            && let Some((texture, _)) = self.pixel.take()
+        {
+            self.renderer
+                .destroy_dynamic_texture(&mut self.assets.textures, texture)?;
+        }
+        if let Some((texture, image)) = self.pixel.as_mut() {
+            if !std::ptr::eq(image.rgba().as_ptr(), frame.image.rgba().as_ptr()) {
+                self.renderer
+                    .update_dynamic_texture(*texture, frame.image.rgba())?;
+                *image = frame.image.clone();
+            }
+            return Ok(texture.id());
+        }
+        let texture =
+            self.renderer
+                .create_dynamic_texture(&mut self.assets.textures, size.0, size.1)?;
+        self.renderer
+            .update_dynamic_texture(texture, frame.image.rgba())?;
+        *self.pixel = Some((texture, frame.image.clone()));
+        Ok(texture.id())
+    }
+}
+
 struct App {
     // Graphics is explicitly destroyed before the window on suspension/exit.
     presenter: Option<Renderer2D>,
-    textures: Textures,
+    assets: SceneAssets,
+    pixel_texture: Option<(DynamicTexture, Image)>,
+    profile: Option<NativeProfile>,
     window: Option<GameWindow>,
     options: Options,
     session: Session,
@@ -352,12 +474,22 @@ struct App {
     gamepads: Gamepads,
     stick: StickNav,
     was_capturing: bool,
+    last_game_pointer: Option<(f64, f64)>,
     capture_axes: [bool; 6],
     fullscreen_request: Option<bool>,
     size_request: Option<(u32, u32)>,
 }
 
 impl App {
+    fn scene(&mut self) -> classicclassics_collection::Result<quasar_render_2d::Canvas> {
+        let mut target = GpuSceneTarget {
+            renderer: self.presenter.as_mut().expect("presenter exists"),
+            assets: &mut self.assets,
+            pixel: &mut self.pixel_texture,
+        };
+        self.session.render(&mut target)
+    }
+
     fn fail(&mut self, event_loop: &ActiveEventLoop, error: impl std::fmt::Display) {
         self.error = Some(error.to_string());
         event_loop.exit();
@@ -415,6 +547,9 @@ impl App {
         }
         window.input.set_bindings(self.controls.bindings.clone())?;
         let size = window.native().inner_size();
+        if let Some((texture, _)) = self.pixel_texture.take() {
+            self.assets.textures.remove(texture.id());
+        }
         self.presenter = Some(Renderer2D::for_window(
             window.shared_native(),
             (size.width.max(1), size.height.max(1)),
@@ -433,13 +568,23 @@ impl App {
         if !window.drawable() {
             return Ok(());
         }
-        let scene = self.session.scene();
+        let started = Instant::now();
+        let scene = self.scene()?;
+        let scene_time = started.elapsed();
+        let presenting = Instant::now();
         let outcome = self
             .presenter
             .as_mut()
             .expect("presenter exists with a window")
-            .present(&scene, &self.textures)?;
+            .present(&scene, &self.assets.textures)?;
         if outcome == PresentOutcome::Presented {
+            if let Some(profile) = &mut self.profile {
+                profile.record(
+                    scene_time,
+                    presenting.elapsed(),
+                    self.presenter.as_ref().unwrap().stats(),
+                );
+            }
             self.frames += 1;
             if self.options.exercise_window {
                 self.exercise()?;
@@ -453,6 +598,9 @@ impl App {
             self.session.sounds.clear();
             return;
         };
+        let paused = self.session.settings_open()
+            || matches!(&self.session.screen, classicclassics_collection::session::Screen::Game(game) if game.paused());
+        audio.pause_music(paused);
         for sound in self.session.sounds.drain(..) {
             let pan = match sound {
                 classicclassics_collection::audio::Sound::Paddle => 0.0,
@@ -615,6 +763,7 @@ impl App {
                 self.exercise_stage = 3;
             }
             3 if self.frames >= 13 => {
+                let size = window.native().inner_size();
                 let presenter = self.presenter.as_mut().expect("presenter exists");
                 presenter.set_options(DisplayOptions {
                     filter: Filter::Linear,
@@ -622,11 +771,11 @@ impl App {
                     aspect: None,
                 })?;
                 presenter.resize(0, 0);
-                let scene = self.session.scene();
-                if presenter.present(&scene, &self.textures)? != PresentOutcome::Deferred {
+                let scene = self.scene()?;
+                let presenter = self.presenter.as_mut().expect("presenter exists");
+                if presenter.present(&scene, &self.assets.textures)? != PresentOutcome::Deferred {
                     return Err("zero-size surface was not deferred".into());
                 }
-                let size = window.native().inner_size();
                 presenter.resize(size.width, size.height);
                 self.exercise_stage = 4;
             }
@@ -808,6 +957,58 @@ impl ApplicationHandler for App {
                 };
                 build_input(&window.input, self.gamepads.input(), &mut self.stick)
             };
+            if !self.options.autoplay
+                && let Some(window) = &self.window
+            {
+                for (index, slot) in (1..4).enumerate() {
+                    let pad = self
+                        .gamepads
+                        .hub
+                        .player(PlayerId::new(slot))
+                        .map(|player| &player.input)
+                        .unwrap_or(&self.gamepads.fallback);
+                    let mut state = classicclassics_collection::input::PlayerControls {
+                        x: axis(pad.action(controls::MOVE_HORIZONTAL).value),
+                        y: axis(pad.action(controls::MOVE_VERTICAL).value),
+                        fire: pad.action(controls::FIRE).held()
+                            || pad.action(controls::FIRE).pressed,
+                        jump: pad.action(controls::JUMP).held()
+                            || pad.action(controls::JUMP).pressed,
+                        secondary: pad.action(controls::HYPERSPACE).held()
+                            || pad.action(controls::HYPERSPACE).pressed,
+                    };
+                    if slot == 1 {
+                        state.x = axis(
+                            (f32::from(state.x)
+                                + window.input.action(controls::P2_HORIZONTAL).value)
+                                .clamp(-1.0, 1.0),
+                        );
+                        state.y = axis(
+                            (f32::from(state.y) + window.input.action(controls::P2).value)
+                                .clamp(-1.0, 1.0),
+                        );
+                        state.fire |= window.input.action(controls::P2_FIRE).held()
+                            || window.input.action(controls::P2_FIRE).pressed;
+                        state.jump |= window.input.action(controls::P2_JUMP).held()
+                            || window.input.action(controls::P2_JUMP).pressed;
+                        state.secondary |= window.input.action(controls::P2_SECONDARY).held()
+                            || window.input.action(controls::P2_SECONDARY).pressed;
+                    }
+                    input.other_players[index] = state;
+                }
+                let cursor = window.input.cursor_physical;
+                if cursor != self.last_game_pointer {
+                    self.last_game_pointer = cursor;
+                    let size = window.native().inner_size();
+                    input.pointer = Viewport::calculate(
+                        self.session.canvas_size(),
+                        (size.width, size.height),
+                        self.presenter.as_ref().expect("presenter exists").options(),
+                    )
+                    .and_then(|view| cursor.and_then(|(x, y)| view.to_source(x, y)))
+                    .map(|(x, y)| [x as f32, y as f32]);
+                }
+            }
             // Recovery navigation keeps the shared settings accessible even
             // after the player clears/remaps all menu actions.
             if self.session.settings_open()
@@ -854,7 +1055,14 @@ impl ApplicationHandler for App {
                         ..Default::default()
                     });
             }
+            let previous_game = self.session.game_kind();
             let quit = self.session.tick(input);
+            if self.session.game_kind() != previous_game {
+                // Static asset preparation is launch time, not elapsed gameplay.
+                // Do not fast-forward a new game to catch up with loading.
+                self.clock.reset();
+                self.previous = Instant::now();
+            }
             if let Some(window) = &mut self.window {
                 window.input.consume_edges();
             }
@@ -902,6 +1110,7 @@ impl ApplicationHandler for App {
             );
             if let Some(presenter) = &self.presenter {
                 println!("render_2d_stats={:?}", presenter.stats());
+                println!("dynamic_textures={}", presenter.dynamic_texture_count());
             }
             println!("{}", self.session.summary());
             event_loop.exit();
@@ -913,14 +1122,23 @@ impl ApplicationHandler for App {
     }
 
     fn exiting(&mut self, _: &ActiveEventLoop) {
-        if let Some(renderer) = &mut self.presenter
-            && let Some(path) = &self.options.screenshot
+        if let Some(profile) = &self.profile {
+            profile.report();
+        }
+        if self.presenter.is_some()
+            && let Some(path) = self.options.screenshot.clone()
         {
-            let scene = self.session.scene();
-            match renderer.render_to_image(&scene, &self.textures) {
-                Ok(pixels) => {
+            let result = self.scene().and_then(|scene| {
+                let renderer = self.presenter.as_mut().expect("presenter exists");
+                Ok((
+                    renderer.render_to_image(&scene, &self.assets.textures)?,
+                    scene,
+                ))
+            });
+            match result {
+                Ok((pixels, scene)) => {
                     if let Err(error) =
-                        quasar_render_2d::write_png(path, scene.width(), scene.height(), &pixels)
+                        quasar_render_2d::write_png(&path, scene.width(), scene.height(), &pixels)
                     {
                         self.error.get_or_insert_with(|| error.to_string());
                     }
@@ -948,6 +1166,79 @@ mod tests {
         let mut gamepad = InputState::default();
         gamepad.set_bindings(bindings).unwrap();
         (keyboard, gamepad)
+    }
+
+    #[test]
+    fn four_controller_slots_keep_inputs_independent_and_share_remapping() {
+        let mut pads = Gamepads::new(Controls::default().bindings);
+        #[cfg(feature = "gamepad")]
+        {
+            pads.backend = None;
+        }
+        let devices: Vec<_> = (0..4)
+            .map(|slot| {
+                pads.hub
+                    .connect(quasar_input::GamepadFingerprint::new(format!(
+                        "test controller {slot}"
+                    )))
+            })
+            .collect();
+        pads.poll();
+        for (slot, device) in devices.iter().enumerate() {
+            assert_eq!(
+                pads.hub.assignment(PlayerId::new(slot as u8)),
+                Some(*device)
+            );
+        }
+        let mut controls = Controls::default();
+        controls.bindings.actions.insert(
+            controls::JUMP.into(),
+            vec![quasar_input::Binding::gamepad_button(GamepadButton::West)],
+        );
+        pads.set_bindings(controls.bindings).unwrap();
+        pads.hub.button(devices[2], GamepadButton::West, true);
+        for slot in 0..4 {
+            let pressed = pads
+                .hub
+                .player(PlayerId::new(slot))
+                .unwrap()
+                .input
+                .action(controls::JUMP)
+                .pressed;
+            assert_eq!(pressed, slot == 2);
+        }
+        pads.consume_edges();
+        assert!(
+            !pads
+                .hub
+                .player(PlayerId::new(2))
+                .unwrap()
+                .input
+                .action(controls::JUMP)
+                .pressed
+        );
+        pads.release_all();
+        assert!(
+            !pads
+                .hub
+                .player(PlayerId::new(2))
+                .unwrap()
+                .input
+                .action(controls::JUMP)
+                .held()
+        );
+    }
+
+    #[test]
+    fn imported_player_one_movement_ignores_player_two_arrow_keys() {
+        let (mut keyboard, gamepad) = states();
+        keyboard.key(Key::ArrowLeft, true);
+        let mut nav = StickNav::default();
+        let input = build_input(&keyboard, &gamepad, &mut nav);
+        assert_eq!(input.move_x, 0);
+        assert_eq!(keyboard.action(controls::P2_HORIZONTAL).value, -1.0);
+        keyboard.key(Key::KeyD, true);
+        assert_eq!(build_input(&keyboard, &gamepad, &mut nav).move_x, 1);
     }
 
     #[test]
@@ -1077,10 +1368,26 @@ mod tests {
     }
 
     #[test]
+    fn space_jumps_and_left_mouse_attacks_independently() {
+        let (mut keyboard, gamepad) = states();
+        let mut stick = StickNav::default();
+        keyboard.key(Key::Space, true);
+        let input = build_input(&keyboard, &gamepad, &mut stick);
+        assert!(input.jump && input.jump_pressed);
+        assert!(!input.fire && !input.fire_pressed);
+        keyboard.key(Key::Space, false);
+        keyboard.consume_edges();
+        keyboard.mouse_button(quasar_input::MouseButton::Left, true);
+        let input = build_input(&keyboard, &gamepad, &mut stick);
+        assert!(input.fire && input.fire_pressed);
+        assert!(!input.jump && !input.jump_pressed);
+    }
+
+    #[test]
     fn keyboard_edges_and_held_fire_are_separate() {
         let (mut keyboard, gamepad) = states();
         keyboard.key(Key::KeyW, true);
-        keyboard.key(Key::Space, true);
+        keyboard.mouse_button(quasar_input::MouseButton::Left, true);
         let mut stick = StickNav::default();
         let input = build_input(&keyboard, &gamepad, &mut stick);
         assert!(input.menu_up);

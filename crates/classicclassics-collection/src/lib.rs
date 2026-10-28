@@ -7,6 +7,7 @@ pub mod controls_screen;
 pub mod games;
 pub mod menu;
 mod records;
+pub mod rendering;
 pub mod session;
 pub mod settings;
 pub mod settings_screen;
@@ -17,3 +18,5 @@ pub use session::{Screen, Session};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+pub use classicclassics_core::input;
