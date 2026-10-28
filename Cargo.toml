@@ -28,13 +28,9 @@ classicclassics-collection = { path = "crates/classicclassics-collection", defau
 classicclassics-pong = { path = "crates/classicclassics-pong" }
 classicclassics-lunar = { path = "crates/classicclassics-lunar" }
 classicclassics-asteroids = { path = "crates/classicclassics-asteroids" }
-
 classicclassics-micromages = { path = "crates/classicclassics-micromages" }
-
 classicclassics-jackal = { path = "crates/classicclassics-jackal" }
-
 classicclassics-missile-command = { path = "crates/classicclassics-missile-command" }
-
 classicclassics-river-raid = { path = "crates/classicclassics-river-raid" }
 
 [package]
