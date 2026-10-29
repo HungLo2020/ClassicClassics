@@ -40,7 +40,7 @@ impl Camera {
 pub struct Texture {
     pub width: usize,
     pub height: usize,
-    rgba: Vec<u8>,
+    rgba: std::sync::Arc<[u8]>,
 }
 
 impl Texture {
@@ -52,10 +52,13 @@ impl Texture {
         Ok(Self {
             width,
             height,
-            rgba,
+            rgba: rgba.into(),
         })
     }
 
+    pub(crate) fn image(&self) -> quasar_render_2d::Image {
+        quasar_render_2d::Image::new(self.width as u32,self.height as u32,self.rgba.clone()).unwrap()
+    }
     pub fn rgba(&self) -> &[u8] {
         &self.rgba
     }
@@ -67,6 +70,7 @@ impl Texture {
 pub struct Canvas {
     pub width: usize,
     pub height: usize,
+    pub(crate) quasar: Option<crate::quasar_video::QuasarCanvas>,
     pixels: Vec<u32>,
 }
 
@@ -81,6 +85,7 @@ impl Canvas {
         Self {
             width,
             height,
+            quasar: None,
             pixels: vec![0; width * height],
         }
     }
@@ -90,16 +95,19 @@ impl Canvas {
         &self.pixels
     }
     pub fn clear(&mut self, color: u32) {
+        if let Some(q)=&mut self.quasar { q.clear(color); return; }
         self.pixels.fill(color & 0xffffff);
     }
 
     pub fn pixel(&mut self, x: i32, y: i32, color: u32) {
+        if let Some(q)=&mut self.quasar { q.rect(Rect::new(x,y,1,1),color); return; }
         if x >= 0 && y >= 0 && (x as usize) < self.width && (y as usize) < self.height {
             self.pixels[y as usize * self.width + x as usize] = color & 0xffffff;
         }
     }
 
     pub fn fill_rect(&mut self, rect: Rect, color: u32) {
+        if let Some(q)=&mut self.quasar { q.rect(rect,color); return; }
         let x0 = (rect.x as i64).clamp(0, self.width as i64) as usize;
         let y0 = (rect.y as i64).clamp(0, self.height as i64) as usize;
         let x1 = (rect.x as i64 + rect.width as i64).clamp(0, self.width as i64) as usize;
@@ -145,6 +153,7 @@ impl Canvas {
         flip_x: bool,
         flip_y: bool,
     ) {
+        if let Some(q)=&mut self.quasar { q.draw(texture,source,dest,flip_x,flip_y,None); return; }
         if source.width == 0 || source.height == 0 || dest.width == 0 || dest.height == 0 {
             return;
         }
@@ -468,6 +477,11 @@ impl Renderer {
         textures
     }
 
+    pub fn render_draw(&mut self, game: &crate::game::Game, assets: &crate::assets::Assets) -> classicclassics_core::tiled::DrawFrame {
+        self.canvas.quasar.get_or_insert_with(Default::default).begin();
+        self.render(game,assets);
+        self.canvas.quasar.as_ref().unwrap().frame()
+    }
     pub fn render(&mut self, game: &crate::game::Game, assets: &crate::assets::Assets) -> &[u32] {
         use crate::game::GameState;
         self.canvas.clear(0);
@@ -528,12 +542,13 @@ impl Renderer {
             .and_then(|b| b.headquarters_building_graphics());
         self.phase_age = game.tick.saturating_sub(game.texture_phase_tick);
         let source_atlas = self.world_textures(assets, stage).0;
-        let cycled_atlas = game
-            .palette_cycle
-            .visible()
-            .filter(|_| game.texture_phase_distance == 0.)
-            .map(|phase| assets.palette_cycle_art.compose(source_atlas, stage, phase));
+        let cycle=game.palette_cycle.visible().filter(|_|game.texture_phase_distance==0.);
+        let cycled_atlas=cycle.map(|phase| {
+            if let Some(q)=&mut self.canvas.quasar { q.cycled(source_atlas,assets,stage,phase) }
+            else { assets.palette_cycle_art.compose(source_atlas,stage,phase) }
+        });
         let atlas = cycled_atlas.as_ref().unwrap_or(source_atlas);
+        if let Some(q)=&mut self.canvas.quasar { q.terrain(game,level,stage,atlas); } else {
         // Palette variants occupy consecutive groups of 256 atlas tiles.
         let first_x = ((game.camera.x / level.tile_size as f32).floor() as i32).max(0) as usize;
         let first_y = ((game.camera.y / level.tile_size as f32).floor() as i32).max(0) as usize;
@@ -566,6 +581,7 @@ impl Renderer {
                     false,
                 );
             }
+        }
         }
         let mut scene = Vec::new();
         for death in &game.infantry_deaths {
@@ -981,6 +997,11 @@ impl Renderer {
                 flip_y: false,
             });
         }
+        if let Some(q)=&mut self.canvas.quasar {
+            q.finish_background();
+            parts.sort_by_key(|part|part.priority);
+            for part in parts { q.draw(part.texture,part.source,part.destination,part.flip_x,part.flip_y,Some(part.behind_background)); }
+        } else {
         // Only the airbase formation frames carry background priority. The
         // original palette proof verifies that black is exactly color index0
         // throughout that stage, including its complete graphics transition.
@@ -1000,6 +1021,7 @@ impl Renderer {
             if part.behind_background {
                 restore_opaque_background(&mut self.canvas, &part, background.as_ref().unwrap());
             }
+        }
         }
     }
 
@@ -1162,6 +1184,33 @@ mod tests {
         restore_opaque_background(&mut canvas, &part, &background);
         assert_eq!(canvas.pixels(), &[0xff0000, 0x005324, 0x0000ff]);
     }
+    #[test]
+    fn quasar_scene_priority_matches_software_for_all_oam_rotations() {
+        let assets=crate::assets::Assets::load(&crate::assets::Assets::default_directory()).unwrap();
+        let behind=assets.frames.iter().position(|frame|frame.parts.iter().any(|p|p.behind_background)).unwrap() as u16;
+        let mut game=crate::game::Game::new();game.stage=3;
+        let mut rgba=Vec::new();
+        for y in 0..HEIGHT { for x in 0..WIDTH { rgba.extend_from_slice(if (x/7+y/9)%2==0 { &[0,0,0,255] } else { &[0,83,36,255] }); } }
+        let background=Texture::from_rgba(WIDTH,HEIGHT,rgba).unwrap();
+        let mut cpu=Renderer::new();let mut gpu=Renderer::new();
+        gpu.canvas.quasar=Some(Default::default());
+        for rotation in 0..64 {
+            game.sprite_rotation=rotation;
+            cpu.canvas.clear(0);cpu.canvas.draw_texture(&background,0,0);
+            let q=gpu.canvas.quasar.as_mut().unwrap();q.begin();q.background=true;
+            gpu.canvas.draw_texture(&background,0,0);
+            for renderer in [&mut cpu,&mut gpu] {
+                renderer.draw_scene(&assets,&game,3,vec![
+                    SceneSprite::new(0,behind,80.,80.,Camera::default(),None,false,false),
+                    SceneSprite::new(1,1,80.,80.,Camera::default(),None,false,false),
+                    SceneSprite::new(2,1,83.,85.,Camera::default(),None,true,false),
+                ]);
+            }
+            let actual=gpu.canvas.quasar.as_ref().unwrap().frame().reference_pixels();
+            assert_eq!(cpu.canvas.pixels(),actual,"OAM rotation {rotation}");
+        }
+    }
+
     #[test]
     fn scene_priority_matches_every_original_oam_rotation() {
         let captures: serde_json::Value =

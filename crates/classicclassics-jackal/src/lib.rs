@@ -101,3 +101,5 @@ pub mod palette_cycle;
 pub const TICKS_PER_SECOND: f64 = 60.0988;
 mod adapter;
 pub use adapter::{Game, Record};
+
+mod quasar_video;

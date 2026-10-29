@@ -172,5 +172,17 @@ cargo run --locked -- --game micromages --autoplay --no-save --set audio.volume=
 
 Smoke runs report scene/presentation/interval p95 times, slow intervals, upload
 bytes and dynamic texture count. Statistics exclude the first third of frames;
-use enough frames to reach gameplay. A game frame should use one dynamic texture
-and a few dozen glyph/background quads. Repeat for the other three imports.
+use enough frames to reach gameplay. Software presentation should use one dynamic texture and a few dozen
+glyph/background quads. Micro Mages gameplay and Jackal submit atlas/tile
+quads with zero dynamic framebuffer textures and no recurring texture uploads.
+Repeat for the other imports.
+
+## Quasar tilemap migration
+
+`cargo test --locked -p classicclassics-collection --test quasar_tilemaps` checks
+software-vs-Quasar pixels, cameras, tile edits, animation, cinematic samples and
+production resource cleanup. Jackal's `quasar_scene_priority` unit test covers all
+64 OAM rotations. Native GPU masking and resize/recovery must also be exercised;
+see [Quasar tilemaps](quasar-tilemaps.md) for the presentation adapter and v0.2.18 native performance results.
+Use `cargo run --locked --example profile_tiled_native -- micromages` (or
+`jackal`) to measure steady-state gameplay without setup/cinematics.

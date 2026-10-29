@@ -837,6 +837,14 @@ mod tests {
     }
     fn click(screen: &mut ControlsScreen, controls: &mut Controls, x: f32, y: f32) -> bool {
         screen.set_pointer(UiInput::default().with_pointer(x, y).pressed());
+        let close = screen.tick(Input::default(), controls);
+        if close || screen.capturing() {
+            return close;
+        }
+        screen.set_pointer(UiInput {
+            primary_released: true,
+            ..UiInput::default().with_pointer(x, y)
+        });
         screen.tick(Input::default(), controls)
     }
 

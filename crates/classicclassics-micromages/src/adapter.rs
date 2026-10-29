@@ -28,6 +28,8 @@ pub struct Game {
     pub paused: bool,
     #[serde(skip)]
     frame_cache: FrameCache,
+    #[serde(skip)]
+    draw_cache: classicclassics_core::tiled::DrawCache<crate::video::Video>,
 }
 impl Default for Game {
     fn default() -> Self {
@@ -37,6 +39,7 @@ impl Default for Game {
             pending: Input::default(),
             paused: false,
             frame_cache: FrameCache::default(),
+            draw_cache: Default::default(),
         }
     }
 }
@@ -48,6 +51,7 @@ impl Game {
             pending: Default::default(),
             paused: false,
             frame_cache: Default::default(),
+            draw_cache: Default::default(),
         }
     }
 }
@@ -92,6 +96,7 @@ impl ArcadeGame for Game {
         }
         let input = std::mem::take(&mut self.pending);
         self.frame_cache.invalidate();
+        self.draw_cache.invalidate();
         let in_game = matches!(
             self.engine.screen,
             crate::game::Screen::Playing | crate::game::Screen::StageClear
@@ -135,6 +140,28 @@ impl ArcadeGame for Game {
             move_x: if self.engine.frame % 240 < 120 { 1 } else { -1 },
             ..Default::default()
         }
+    }
+    fn draw_frame(&self, hints: &ControlHints) -> Option<classicclassics_core::tiled::DrawFrame> {
+        if !matches!(
+            self.engine.screen,
+            crate::game::Screen::Playing | crate::game::Screen::StageClear
+        ) || self.engine.world.is_none()
+        {
+            return None;
+        }
+        let mut frame = self
+            .draw_cache
+            .render(|renderer| renderer.render_draw(&self.engine, self.engine.assets()));
+        frame.help = format!(
+            "{} {} MOVE   {} JUMP   {} FIRE   {} SETTINGS{}",
+            hints.move_x,
+            hints.move_y,
+            hints.jump,
+            hints.fire,
+            hints.settings,
+            if self.paused { "   PAUSED" } else { "" }
+        );
+        Some(frame)
     }
     fn scene(&self, hints: &ControlHints) -> Canvas {
         self.pixel_frame(hints).unwrap().reference_canvas()

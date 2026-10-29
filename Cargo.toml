@@ -11,16 +11,19 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+quasar-frame = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18" }
+vulkanic-gal = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18", default-features = false }
+quasar-tilemap = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18", default-features = false, features = ["render-2d"] }
 classicclassics-assets = { path = "crates/classicclassics-assets" }
-quasar-assets = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false }
-quasar-ui = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["render2d"] }
-quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false }
-quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["json", "toml"] }
-quasar-core = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
-quasar-input = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
-quasar-render-2d = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["png"] }
-quasar-storage = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
-quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16" }
+quasar-assets = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18", default-features = false }
+quasar-ui = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18", default-features = false, features = ["render2d"] }
+quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18", default-features = false }
+quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18", default-features = false, features = ["json", "toml"] }
+quasar-core = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18" }
+quasar-input = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18" }
+quasar-render-2d = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18", default-features = false, features = ["png"] }
+quasar-storage = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18" }
+quasar-window = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.18" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 tempfile = "3"
@@ -46,11 +49,13 @@ description = "A Quasar-powered collection of classic arcade games"
 
 [features]
 default = ["desktop", "gamepad", "audio"]
-desktop = ["dep:quasar-window", "quasar-render-2d/gpu", "quasar-render-2d/vulkan"]
+desktop = ["dep:quasar-frame", "dep:vulkanic-gal", "dep:quasar-window", "quasar-render-2d/gpu", "quasar-render-2d/vulkan"]
 gamepad = ["quasar-input/gilrs"]
 audio = ["classicclassics-collection/audio"]
 
 [dependencies]
+quasar-frame = { workspace = true, optional = true }
+vulkanic-gal = { workspace = true, optional = true }
 quasar-ui.workspace = true
 classicclassics-collection.workspace = true
 quasar-config.workspace = true
@@ -61,6 +66,7 @@ quasar-storage.workspace = true
 quasar-window = { workspace = true, optional = true }
 
 [dev-dependencies]
+classicclassics-jackal.workspace = true
 tempfile.workspace = true
 
 [profile.dev.package.shaderc-sys]
@@ -96,3 +102,11 @@ opt-level = 1
 opt-level = 1
 [profile.dev.package.png]
 opt-level = 1
+
+[profile.dev.package.quasar-tilemap]
+opt-level = 1
+
+[[example]]
+name = "profile_tiled_native"
+path = "DevUtils/profile_tiled_native.rs"
+required-features = ["desktop"]

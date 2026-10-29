@@ -2,6 +2,7 @@
 //! only the native host owns GPU dynamic-texture handles.
 use crate::{GameKind, Result};
 pub use classicclassics_core::imported::PixelFrame;
+pub use classicclassics_core::tiled::DrawFrame;
 use quasar_render_2d::{Image, TextureId, Textures};
 use std::collections::BTreeMap;
 
@@ -15,6 +16,11 @@ impl CatalogArt {
 
 pub trait SceneTarget {
     fn upload_frame(&mut self, frame: &PixelFrame) -> Result<TextureId>;
+    fn draw_frame(
+        &mut self,
+        frame: &classicclassics_core::tiled::DrawFrame,
+    ) -> Result<quasar_render_2d::Canvas>;
+    fn clear_draw_frame(&mut self);
     fn artwork(&self) -> &CatalogArt;
 }
 
@@ -22,6 +28,7 @@ pub struct SceneAssets {
     pub textures: Textures,
     pub artwork: CatalogArt,
     frame: Option<(TextureId, Image)>,
+    drawn: BTreeMap<TextureId, TextureId>,
 }
 impl SceneAssets {
     pub fn new() -> Result<Self> {
@@ -33,6 +40,7 @@ impl SceneAssets {
             textures: Textures::default(),
             artwork: CatalogArt::default(),
             frame: None,
+            drawn: Default::default(),
         };
         for kind in GameKind::ALL {
             if kind.cover().is_some() {
@@ -44,7 +52,45 @@ impl SceneAssets {
         Ok(assets)
     }
 }
+impl SceneAssets {
+    pub fn clear_drawn(&mut self) {
+        for (_, id) in std::mem::take(&mut self.drawn) {
+            self.textures.remove(id);
+        }
+    }
+    pub fn import_frame(
+        &mut self,
+        frame: &classicclassics_core::tiled::DrawFrame,
+    ) -> Result<quasar_render_2d::Canvas> {
+        if let Some((id, _)) = self.frame.take() {
+            self.textures.remove(id);
+        }
+        self.drawn.retain(|local, host| {
+            if frame.images.contains_key(local) {
+                true
+            } else {
+                self.textures.remove(*host);
+                false
+            }
+        });
+        for (id, image) in &frame.images {
+            self.drawn
+                .entry(*id)
+                .or_insert_with(|| self.textures.insert(image.clone()));
+        }
+        Ok(frame.fit(|id| self.drawn.get(&id).copied().unwrap_or(id)))
+    }
+}
 impl SceneTarget for SceneAssets {
+    fn clear_draw_frame(&mut self) {
+        self.clear_drawn();
+    }
+    fn draw_frame(
+        &mut self,
+        frame: &classicclassics_core::tiled::DrawFrame,
+    ) -> Result<quasar_render_2d::Canvas> {
+        self.import_frame(frame)
+    }
     fn artwork(&self) -> &CatalogArt {
         &self.artwork
     }

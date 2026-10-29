@@ -25,7 +25,7 @@ and marked for this project. Any deviation is called out explicitly.
 
 - [x] JSON saves are written atomically by `quasar_storage::write_json`;
       TOML preferences use the collection adapter with the same temporary-file,
-      `sync_all` and rename contract (Quasar 0.2.16 has no TOML writer).
+      `sync_all` and rename contract (Quasar 0.2.18 has no TOML writer).
 - [x] Synced data contains no absolute paths, machine identifiers or lock files.
 - [x] Saves from older versions load. Format version 1 is accepted; unknown
       versions are preserved and defaults are used rather than overwriting.

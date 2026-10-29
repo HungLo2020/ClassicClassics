@@ -48,3 +48,5 @@ mod adapter;
 pub use adapter::{Game, Record};
 
 pub mod audio_cues;
+
+mod quasar_video;

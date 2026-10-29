@@ -29,16 +29,17 @@ Immutable assets are owned by each running game and restored when loading a
 standalone fixture snapshot. All mutable simulation state remains serializable without replaying an
 input log. Existing standalone device, storage and executable hosts are omitted.
 
-The original software renderers remain to preserve the recovered pixels. Each
-adapter caches one immutable Quasar `Image` per original video tick. Redraws
-between ticks and paused frames reuse its RGBA allocation. `Session::render`
-uploads it through a host-owned `SceneTarget`: a persistent Quasar dynamic texture
-on the GPU, or a CPU image in `SceneAssets` for reference screenshots. A game image
-is **one sprite**, not thousands of tiny rectangles. Texture storage is reused;
-changing game dimensions destroys the old dynamic texture before creating another.
-Control hints and shared overlays remain ordinary Quasar draw lists. The old
-geometry-only `scene`/`reference_canvas` path exists for simulation reference tests;
-production hosts must use `Session::render`.
+Micro Mages gameplay and Jackal use Quasar tilemaps, preloaded atlases and native
+sprite draw lists. Indexed palettes and pixel-priority masks preserve palette
+selection, doorways and rotating sprite priority. Visible destruction uses
+transactional `Runtime::set_tiles` edits. See [Quasar tilemaps](quasar-tilemaps.md)
+for rendering/resource boundaries, reference tests and native frame composition.
+
+Micro Mages' non-gameplay presentation screens and Missile Command/River Raid
+retain the cached single-image adapter. Redraws between video ticks and paused
+frames reuse their RGBA allocations. Production hosts use `Session::render`;
+the retained software renderers and geometry-only `scene` API provide reference
+comparisons. All paths share Quasar scaling, controls and settings overlays.
 
 PNG decoding now uses the shared Quasar loader; game-specific palette conversion
 and pixel fixtures preserve the recovered rendering behavior. See [Shared assets](assets.md). Imported modules retain their source

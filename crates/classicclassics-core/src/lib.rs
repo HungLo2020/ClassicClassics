@@ -7,6 +7,7 @@ pub mod imported;
 pub mod input;
 pub mod paint;
 pub mod simulation;
+pub mod tiled;
 
 pub use audio::Sound;
 pub use controls::ControlHints;
@@ -39,6 +40,9 @@ pub trait ArcadeGame: Default + Clone + std::fmt::Debug + Serialize + Deserializ
         Ok(Self::default())
     }
     const COVER: Option<&'static [u8]> = None;
+    fn draw_frame(&self, _hints: &ControlHints) -> Option<tiled::DrawFrame> {
+        None
+    }
     fn pixel_frame(&self, _hints: &ControlHints) -> Option<imported::PixelFrame> {
         None
     }

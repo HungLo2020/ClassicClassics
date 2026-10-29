@@ -1,6 +1,7 @@
 //! Native desktop host: Quasar window, input, renderer, audio, storage and
 //! fixed-step timing around the shared `Session`.
 
+use crate::native_renderer::NativeRenderer as Renderer2D;
 use classicclassics_collection::audio::{Audio, SoundBank};
 use classicclassics_collection::cli::Options;
 use classicclassics_collection::controls::{self, Controls};
@@ -16,8 +17,7 @@ use quasar_input::{
     MouseButton, PlayerId,
 };
 use quasar_render_2d::{
-    DisplayOptions, DynamicTexture, Filter, Image, PresentOutcome, Renderer2D, Scaling, TextureId,
-    Viewport,
+    DisplayOptions, DynamicTexture, Filter, Image, PresentOutcome, Scaling, TextureId, Viewport,
 };
 use quasar_storage::GamePaths;
 use quasar_window::{
@@ -417,6 +417,19 @@ struct GpuSceneTarget<'a> {
     pixel: &'a mut Option<(DynamicTexture, Image)>,
 }
 impl SceneTarget for GpuSceneTarget<'_> {
+    fn clear_draw_frame(&mut self) {
+        self.assets.clear_drawn();
+    }
+    fn draw_frame(
+        &mut self,
+        frame: &classicclassics_collection::rendering::DrawFrame,
+    ) -> classicclassics_collection::Result<quasar_render_2d::Canvas> {
+        if let Some((texture, _)) = self.pixel.take() {
+            self.renderer
+                .destroy_dynamic_texture(&mut self.assets.textures, texture)?;
+        }
+        self.assets.import_frame(frame)
+    }
     fn artwork(&self) -> &CatalogArt {
         &self.assets.artwork
     }

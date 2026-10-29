@@ -10,6 +10,7 @@ pub const WIDTH: usize = 256;
 pub const HEIGHT: usize = 240;
 
 pub struct Video {
+    quasar: Option<crate::quasar_video::QuasarVideo>,
     pixels: Vec<u32>,
     background_opaque: Vec<bool>,
     behind_background: bool,
@@ -22,14 +23,19 @@ impl Default for Video {
 impl Video {
     pub fn new() -> Self {
         Self {
+            quasar: None,
             pixels: vec![0; WIDTH * HEIGHT],
             background_opaque: vec![false; WIDTH * HEIGHT],
             behind_background: false,
         }
     }
+    pub fn render_draw(&mut self, game: &Game, assets: &Assets) -> classicclassics_core::tiled::DrawFrame {
+        self.quasar.get_or_insert_with(Default::default).begin();
+        self.render(game,assets);
+        self.quasar.as_ref().unwrap().frame()
+    }
     pub fn render(&mut self, game: &Game, assets: &Assets) -> &[u32] {
-        self.pixels.fill(0x080d1c);
-        self.background_opaque.fill(false);
+        if self.quasar.is_none() { self.pixels.fill(0x080d1c); self.background_opaque.fill(false); }
         if let Some(run) = &game.world {
             let camera = run.camera.position.y.floor() as i32;
             self.level(&run.level, assets, camera);
@@ -460,6 +466,7 @@ impl Video {
         }
     }
     fn level(&mut self, level: &Level, assets: &Assets, camera: i32) {
+        if let Some(draw) = &mut self.quasar { draw.level(level,assets,camera); return; }
         self.pixels
             .fill(assets.colors[usize::from(level.colors[0])]);
         let first = (camera / 8).max(0) as usize;
@@ -595,6 +602,7 @@ impl Video {
         }
     }
     fn tile(&mut self, assets: &Assets, level: &Level, draw: TileDraw) {
+        if let Some(scene) = &mut self.quasar { scene.tile(draw,self.behind_background); return; }
         let atlas_x = usize::from(draw.tile) % 16 * 8;
         let atlas_y = usize::from(draw.tile) / 16 * 8;
         for row in 0..8 {
@@ -632,6 +640,7 @@ impl Video {
         }
     }
     fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32) {
+        if let Some(draw) = &mut self.quasar { draw.rect(x,y,w,h,color); return; }
         for row in y.max(0)..(y + h).min(HEIGHT as i32) {
             for col in x.max(0)..(x + w).min(WIDTH as i32) {
                 self.pixels[row as usize * WIDTH + col as usize] = color;
@@ -639,14 +648,14 @@ impl Video {
         }
     }
 }
-struct TileDraw {
-    tile: u16,
-    x: i32,
-    y: i32,
-    palette: u8,
-    sprite: bool,
-    flip_x: bool,
-    flip_y: bool,
+pub(crate) struct TileDraw {
+    pub(crate) tile: u16,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+    pub(crate) palette: u8,
+    pub(crate) sprite: bool,
+    pub(crate) flip_x: bool,
+    pub(crate) flip_y: bool,
 }
 
 struct SpriteDraw {

@@ -112,6 +112,11 @@ or a different Basalt catalog entry.
 
 ## Pixel games and cover art
 
+A tile/sprite game can implement `ArcadeGame::draw_frame` and return a Canvas
+plus shared images. Use Quasar's preloaded tilesets and runtime edits; keep device
+handles in the host. See [Quasar tilemaps](quasar-tilemaps.md) for caching,
+palette/mask semantics and ownership.
+
 An imported software renderer can implement `ArcadeGame::pixel_frame` and return a
 `PixelFrame` containing a cached Quasar `Image`, aspect ratio and help text. Keep
 `FrameCache` out of Serde snapshots and invalidate it only on original video ticks

@@ -60,6 +60,9 @@ macro_rules! games {
             pub fn autoplay(&self) -> Input {
                 match self { $(Self::$variant(game) => game.autoplay(),)+ }
             }
+            pub fn draw_frame(&self, hints: &ControlHints) -> Option<classicclassics_core::tiled::DrawFrame> {
+                match self { $(Self::$variant(game) => game.draw_frame(hints),)+ }
+            }
             pub fn pixel_frame(&self, hints: &ControlHints) -> Option<classicclassics_core::imported::PixelFrame> {
                 match self { $(Self::$variant(game) => game.pixel_frame(hints),)+ }
             }

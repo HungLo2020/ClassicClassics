@@ -231,12 +231,20 @@ impl Session {
         let hints = self.controls.hints();
         let base = match &self.screen {
             Screen::Menu => {
+                target.clear_draw_frame();
                 menu::scene_with_art(self.selected, &self.records, &hints, target.artwork())
             }
-            Screen::Game(game) => match game.pixel_frame(&hints) {
-                Some(frame) => frame.canvas(target.upload_frame(&frame)?),
-                None => game.scene(&hints),
-            },
+            Screen::Game(game) => {
+                if let Some(frame) = game.draw_frame(&hints) {
+                    target.draw_frame(&frame)?
+                } else {
+                    target.clear_draw_frame();
+                    match game.pixel_frame(&hints) {
+                        Some(frame) => frame.canvas(target.upload_frame(&frame)?),
+                        None => game.scene(&hints),
+                    }
+                }
+            }
         };
         Ok(self.overlay(base))
     }

@@ -57,7 +57,9 @@ invalidates live handles. This is a cache budget, not a whole-process memory cap
 JSON bytes are read through Quasar and interpreted/validated by game loaders;
 PNG images, decoded clips and compressed stream sources are typed cached assets.
 The cache is cleared on return to the catalog or a failed launch. GPU textures
-remain host-owned and follow the existing dynamic-texture lifecycle.
+remain host-owned. Tiled scenes retain atlas/palette identities until catalog
+return; software presentation uses the existing dynamic-texture lifecycle.
+See [Quasar tilemaps](quasar-tilemaps.md).
 
 Missing/invalid content returns to the catalog with the game/file error. Enter
 retries; Backspace dismisses the dialog so another game can be selected. Failed

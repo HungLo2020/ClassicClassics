@@ -20,7 +20,7 @@ pub fn write<T: Serialize>(path: &Path, value: &T) -> Result {
     match FileFormat::from_path(path) {
         Some(FileFormat::Json) => quasar_storage::write_json(path, value)?,
         Some(FileFormat::Toml) => {
-            // Quasar 0.2.16 exposes atomic JSON writes only. Match its
+            // Quasar 0.2.18 exposes atomic JSON writes only. Match its
             // same-directory temporary file, sync and rename contract for TOML.
             let text = toml::to_string_pretty(value)?;
             let parent = path

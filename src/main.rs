@@ -3,6 +3,8 @@
 
 #[cfg(feature = "desktop")]
 mod desktop;
+#[cfg(feature = "desktop")]
+mod native_renderer;
 
 use classicclassics_collection::cli::{self, Options};
 use classicclassics_collection::controls::Controls;

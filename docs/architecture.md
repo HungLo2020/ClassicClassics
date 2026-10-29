@@ -192,7 +192,7 @@ from a corrupt one; corrupt files are preserved rather than overwritten.
 `write_json` is atomic (temporary file, `sync_all`, rename). Preferences are
 parsed by Quasar Config. Its `Config` handles defaults/file/CLI precedence and
 validates typed values through Serde. TOML configuration is written by a small
-`config_file` adapter with the same atomic contract, since Quasar 0.2.16 exposes
+`config_file` adapter with the same atomic contract, since Quasar 0.2.18 exposes
 no TOML writer. Legacy JSON is read only when the TOML file is absent; valid
 preferences migrate on normal exit without deleting JSON. Corrupt/newer files
 prevent replacement, and saves retain their version-one JSON schema. The files are:
@@ -215,3 +215,8 @@ replaced in memory by defaults.
 
 Asset ownership, loading boundaries and recoverable failures are documented in
 [Shared assets](assets.md).
+
+Micro Mages gameplay and Jackal now use the `ArcadeGame::draw_frame` path with
+Quasar tilemaps, indexed palettes and pixel masks. Other software-rendered screens
+retain `pixel_frame`. [Quasar tilemaps](quasar-tilemaps.md) describes resource
+ownership, headless parity and native frame-target composition.

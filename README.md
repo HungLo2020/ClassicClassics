@@ -217,7 +217,8 @@ Nothing in the game loop is hand-rolled infrastructure:
 | `quasar-window` | Native window, desktop identity, keyboard/mouse state, winit events |
 | `quasar-input` | Named actions, bindings, edge detection, deadzones, controller hotplug |
 | `quasar-ui` | Shared controls editor widgets, layout, focus and isolated rebinding |
-| `quasar-render-2d` | Ordered quad draw lists, bitmap font, GPU presentation, headless rasterisation |
+| `quasar-render-2d` | Ordered draw lists, indexed palettes, pixel-priority masks, GPU presentation and headless rasterisation |
+| `quasar-tilemap` | Micro Mages/Jackal terrain, preloaded atlases, camera culling and incremental destruction edits |
 | `quasar-audio` | Generated effects, original Ogg/WAV clips, music buses and optional CPAL output |
 | `quasar-storage` | Basalt directory discovery and atomic JSON persistence |
 | `quasar-config` | Common CLI/environment parsing (`--headless`, `--resolution`, `--no-audio`, …) |
@@ -247,7 +248,7 @@ Records and JSON exports are written through `quasar_storage::write_json`, which
 temporary file in the same directory, syncs it and renames it into place.
 Existing corrupt or newer files are preserved and defaults are used; nothing is
 ever written into `app/`. TOML preferences use the same atomic temporary-file,
-sync and rename pattern in the collection crate, because Quasar 0.2.16 only
+sync and rename pattern in the collection crate, because Quasar 0.2.18 only
 provides a JSON writer.
 
 ## Release and catalog
@@ -290,6 +291,7 @@ python3 DevUtils/verify_package.py dist/ClassicClassics-*-linux-x64.zip
 ## Documentation
 
 - [Adding a game](docs/adding-a-game.md) — crate contract and registration
+- [Quasar tilemaps](docs/quasar-tilemaps.md) — native tile/sprite rendering and fidelity checks
 - [Shared assets](docs/assets.md) — Quasar mounts, loading, ownership and recovery
 - [Architecture](docs/architecture.md) — simulation, rendering, input and host boundaries
 - [Basalt compliance](docs/basalt-compliance.md) — the standard's checklist, item by item
