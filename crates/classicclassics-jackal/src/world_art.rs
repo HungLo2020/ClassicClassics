@@ -1,7 +1,6 @@
 //! Recovered stage texture changes and destructible boss background compositions.
 use crate::renderer::Texture;
 use serde::Deserialize;
-use std::path::Path;
 #[derive(Deserialize)]
 pub struct BossTilePatch {
     pub id: u8,
@@ -34,18 +33,20 @@ pub struct TexturePhase {
     pub tiles: Texture,
     pub sprites: Texture,
 }
-fn png(root: &Path, name: &str, expected: (u32, u32)) -> Result<Texture, String> {
-    let img = image::open(root.join(name))
+fn png(root: &(impl classicclassics_assets::AssetLocation + ?Sized), name: &str, expected: (u32, u32)) -> Result<Texture, String> {
+        let root = root.open_assets()?;
+    let img = root.join(name).image()
         .map_err(|e| e.to_string())?
-        .to_rgba8();
-    if img.dimensions() != expected {
+        ;
+    if (img.width(), img.height()) != expected {
         return Err(format!("Invalid world atlas dimensions: {name}"));
     }
-    Texture::from_rgba(img.width() as usize, img.height() as usize, img.into_raw())
+    Texture::from_rgba(img.width() as usize, img.height() as usize, img.rgba().to_vec())
 }
-pub fn load(root: &Path) -> Result<(Vec<Vec<TexturePhase>>, Vec<BossTilePatch>), String> {
+pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<(Vec<Vec<TexturePhase>>, Vec<BossTilePatch>), String> {
+        let root = root.open_assets()?;
     let source: PhasesFile = serde_json::from_slice(
-        &std::fs::read(root.join("texture_phases.json")).map_err(|e| e.to_string())?,
+        &root.join("texture_phases.json").read().map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
     if source.stages.len() != 6 {
@@ -63,14 +64,14 @@ pub fn load(root: &Path) -> Result<(Vec<Vec<TexturePhase>>, Vec<BossTilePatch>),
             phases.push(TexturePhase {
                 distance: phase.distance,
                 tick_offset: phase.tick_offset,
-                tiles: png(root, &phase.tiles, (128, 512))?,
-                sprites: png(root, &phase.sprites, (128, 1024))?,
+                tiles: png(&root, &phase.tiles, (128, 512))?,
+                sprites: png(&root, &phase.sprites, (128, 1024))?,
             });
         }
         stages.push(phases);
     }
     let patches: PatchFile = serde_json::from_slice(
-        &std::fs::read(root.join("boss_patches.json")).map_err(|e| e.to_string())?,
+        &root.join("boss_patches.json").read().map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
     if patches.patches.iter().enumerate().any(|(id, p)| {

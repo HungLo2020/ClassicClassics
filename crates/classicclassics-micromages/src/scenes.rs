@@ -1,6 +1,5 @@
 //! Editable native cinematic artwork and timelines recovered from the original intro.
 use serde::Deserialize;
-use std::{fs::File, io::BufReader, path::Path};
 
 pub const INTRO_TICKS: u16 = 948;
 pub const LOADING_TICKS: u16 = 298;
@@ -23,29 +22,15 @@ pub struct Presentation {
     loading: Vec<u32>,
 }
 impl Presentation {
-    pub fn load(root: &Path) -> Result<Self, String> {
-        let path = root.join("presentation/cinematic.png");
-        let mut decoder =
-            png::Decoder::new(BufReader::new(File::open(path).map_err(|e| e.to_string())?));
-        decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-        let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
-        let mut bytes = vec![0; reader.output_buffer_size()];
-        let info = reader.next_frame(&mut bytes).map_err(|e| e.to_string())?;
-        if info.color_type != png::ColorType::Rgb || info.width != 512 || info.height % 8 != 0 {
-            return Err(
-                "cinematic.png must be an RGB atlas with width 512 and 8-pixel rows".into(),
-            );
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
+        let image = root.join("presentation/cinematic.png").image()?;
+        if image.width() != 512 || image.height() % 8 != 0 {
+            return Err("cinematic.png must be an atlas with width 512 and 8-pixel rows".into());
         }
-        let pixels = bytes[..info.buffer_size()]
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .map(|c| u32::from(c[0]) << 16 | u32::from(c[1]) << 8 | u32::from(c[2]))
-            .collect();
+        let pixels = rgb_pixels(&image);
         let read = |name: &str| -> Result<Timeline, String> {
-            let file = File::open(root.join(format!("presentation/{name}.json")))
-                .map_err(|e| e.to_string())?;
-            let timeline: Timeline = serde_json::from_reader(file).map_err(|e| e.to_string())?;
+            let timeline: Timeline = root.join(format!("presentation/{name}.json")).json()?;
             if timeline.width != 256
                 || timeline.height != 240
                 || timeline.tile_size != 8
@@ -54,7 +39,7 @@ impl Presentation {
             {
                 return Err(format!("invalid {name} cinematic dimensions"));
             }
-            let count = info.width * info.height / 64;
+            let count = image.width() * image.height() / 64;
             for track in &timeline.tracks {
                 if track.first().is_none_or(|k| k[0] != 0)
                     || track
@@ -71,29 +56,16 @@ impl Presentation {
         if intro.duration != INTRO_TICKS {
             return Err("intro timing does not match screen transition".into());
         }
-        let decoder = png::Decoder::new(BufReader::new(
-            File::open(root.join("presentation/loading.png")).map_err(|e| e.to_string())?,
-        ));
-        let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
-        let mut bytes = vec![0; reader.output_buffer_size()];
-        let info_loading = reader.next_frame(&mut bytes).map_err(|e| e.to_string())?;
-        if info_loading.width != 256
-            || info_loading.height != 240
-            || info_loading.color_type != png::ColorType::Rgb
-        {
-            return Err("loading.png must be 256x240 RGB".into());
+        let loading_image = root.join("presentation/loading.png").image()?;
+        if loading_image.width() != 256 || loading_image.height() != 240 {
+            return Err("loading.png must be 256x240".into());
         }
-        let loading = bytes[..info_loading.buffer_size()]
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .map(|c| u32::from(c[0]) << 16 | u32::from(c[1]) << 8 | u32::from(c[2]))
-            .collect();
+        let loading = rgb_pixels(&loading_image);
         Ok(Self {
             intro,
             title: read("title")?,
             pixels,
-            width: info.width as usize,
+            width: image.width() as usize,
             loading,
         })
     }
@@ -119,4 +91,8 @@ impl Presentation {
             }
         }
     }
+}
+
+pub(crate) fn rgb_pixels(image: &quasar_render_2d::Image) -> Vec<u32> {
+    image.rgba().chunks_exact(4).map(|c| u32::from(c[0]) << 16 | u32::from(c[1]) << 8 | u32::from(c[2])).collect()
 }

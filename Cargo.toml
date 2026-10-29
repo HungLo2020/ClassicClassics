@@ -11,6 +11,8 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+classicclassics-assets = { path = "crates/classicclassics-assets" }
+quasar-assets = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false }
 quasar-ui = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["render2d"] }
 quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false }
 quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.16", default-features = false, features = ["json", "toml"] }

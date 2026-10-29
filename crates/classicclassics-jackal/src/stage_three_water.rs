@@ -1,7 +1,7 @@
 //! Stage-three water graphics: DDB8..DDE2 schedules alternating six-part uploads.
 use crate::renderer::Texture;
 use serde::Deserialize;
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap};
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct StageThreeWater {
     timer: u8,
@@ -84,10 +84,11 @@ pub struct StageThreeWaterArt {
     manifest: Manifest,
 }
 impl StageThreeWaterArt {
-    pub fn load(root: &Path) -> Result<Self, String> {
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
         let path = root.join("textures/stage_three_water/animation.json");
         let manifest: Manifest =
-            serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
+            serde_json::from_slice(&path.read().map_err(|e| e.to_string())?)
                 .map_err(|e| e.to_string())?;
         let mut images = HashMap::new();
         for phase in manifest.early.iter().chain(manifest.late.iter()) {
@@ -98,15 +99,15 @@ impl StageThreeWaterArt {
                 if images.contains_key(name) {
                     continue;
                 }
-                let image = image::open(root.join(name))
+                let image = root.join(name).image()
                     .map_err(|e| e.to_string())?
-                    .to_rgba8();
-                if image.dimensions() != (128, 512) {
+                    ;
+                if (image.width(), image.height()) != (128, 512) {
                     return Err("Invalid water atlas dimensions".into());
                 }
                 images.insert(
                     name.clone(),
-                    Texture::from_rgba(128, 512, image.into_raw())?,
+                    Texture::from_rgba(128, 512, image.rgba().to_vec())?,
                 );
             }
         }

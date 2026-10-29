@@ -7,26 +7,6 @@ use crate::{
 };
 use quasar_render_2d::{Canvas, Image, Rect, Sprite, TextureId};
 use std::cell::RefCell;
-use std::path::{Path, PathBuf};
-
-pub fn asset_root(game: &str, manifest: &str) -> PathBuf {
-    if let Some(app) = std::env::var_os("BASALT_APP_DIR") {
-        return PathBuf::from(app).join("games").join(game);
-    }
-    if let Some(root) = std::env::var_os("BASALT_GAME_DIR") {
-        return PathBuf::from(root).join("app/games").join(game);
-    }
-    if let Some(bin) = std::env::current_exe()
-        .ok()
-        .as_deref()
-        .and_then(Path::parent)
-        && bin.file_name().is_some_and(|name| name == "bin")
-        && let Some(app) = bin.parent()
-    {
-        return app.join("games").join(game);
-    }
-    Path::new(manifest).join("assets")
-}
 
 pub fn pixel_scene(pixels: &[u32], width: usize, height: usize, aspect: f32, help: &str) -> Canvas {
     assert_eq!(pixels.len(), width * height);

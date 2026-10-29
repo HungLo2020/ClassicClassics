@@ -123,3 +123,12 @@ Set the optional `ArcadeGame::COVER` to embedded Basalt PNG bytes. The collectio
 registers and caches these textures automatically and fits the complete portrait
 cover into its card. Preserve source credits and update the artwork provenance
 manifest when importing or changing a cover.
+
+## External assets
+
+Use the shared [asset system](assets.md) for file-backed content. Set
+`ASSET_MANIFEST_DIR` and implement the fallible `ArcadeGame::load` constructor.
+The collection supplies a namespaced `Directory`; the game parses and validates
+its own content. Keep assets in an `Arc`, reuse it on restart, and emit sound cues
+for the shared audio host. Avoid global caches and direct filesystem discovery.
+Procedural games keep the default constructor and need no external directory.

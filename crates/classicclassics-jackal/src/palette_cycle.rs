@@ -1,7 +1,6 @@
 //! Timed background palette animation recovered from DDB0..DE26.
 use crate::renderer::Texture;
 use serde::Deserialize;
-use std::path::Path;
 const PAGE_RANGES: [[u8; 2]; 6] = [[9, 11], [7, 9], [8, 10], [9, 11], [9, 11], [4, 6]];
 /// Deferred native graphics work for the current update.
 #[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
@@ -92,9 +91,10 @@ pub struct PaletteCycleArt {
     colors: Vec<[[u32; 32]; 5]>,
 }
 impl PaletteCycleArt {
-    pub fn load(root: &Path) -> Result<Self, String> {
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
         let entries: Vec<Entry> = serde_json::from_slice(
-            &std::fs::read(root.join("textures/palette_cycles/animation.json"))
+            &root.join("textures/palette_cycles/animation.json").read()
                 .map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
@@ -106,16 +106,17 @@ impl PaletteCycleArt {
             if e.page_range != PAGE_RANGES[stage] {
                 return Err("Invalid palette-cycle page range".into());
             }
-            let image = image::open(root.join(e.swatches))
+            let image = root.join(e.swatches).image()
                 .map_err(|e| e.to_string())?
-                .to_rgb8();
-            if image.dimensions() != (32, 5) {
+                ;
+            if (image.width(), image.height()) != (32, 5) {
                 return Err("Invalid palette-cycle swatch dimensions".into());
             }
             let mut swatches = [[0; 32]; 5];
             for y in 0..5 {
                 for x in 0..32 {
-                    let p = image.get_pixel(x, y).0;
+                    let start = ((y * image.width() + x) * 4) as usize;
+                    let p = &image.rgba()[start..start + 4];
                     swatches[y as usize][x as usize] = u32::from_be_bytes([0, p[0], p[1], p[2]]);
                 }
             }

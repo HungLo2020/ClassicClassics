@@ -310,6 +310,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "classicclassics-assets"
+version = "1.0.0"
+dependencies = [
+ "quasar-assets",
+ "quasar-audio",
+ "quasar-render-2d",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "classicclassics-asteroids"
 version = "1.0.0"
 dependencies = [
@@ -322,6 +334,7 @@ dependencies = [
 name = "classicclassics-collection"
 version = "1.0.0"
 dependencies = [
+ "classicclassics-assets",
  "classicclassics-asteroids",
  "classicclassics-core",
  "classicclassics-jackal",
@@ -330,6 +343,7 @@ dependencies = [
  "classicclassics-missile-command",
  "classicclassics-pong",
  "classicclassics-river-raid",
+ "quasar-assets",
  "quasar-audio",
  "quasar-config",
  "quasar-input",
@@ -346,6 +360,7 @@ dependencies = [
 name = "classicclassics-core"
 version = "1.0.0"
 dependencies = [
+ "classicclassics-assets",
  "quasar-render-2d",
  "serde",
 ]
@@ -354,6 +369,7 @@ dependencies = [
 name = "classicclassics-jackal"
 version = "1.0.0"
 dependencies = [
+ "classicclassics-assets",
  "classicclassics-core",
  "image",
  "quasar-render-2d",
@@ -374,6 +390,7 @@ dependencies = [
 name = "classicclassics-micromages"
 version = "1.0.0"
 dependencies = [
+ "classicclassics-assets",
  "classicclassics-core",
  "png 0.17.16",
  "quasar-render-2d",
@@ -1627,6 +1644,11 @@ name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
+
+[[package]]
+name = "quasar-assets"
+version = "0.2.16"
+source = "git+https://github.com/HungLo2020/Quasar?tag=v0.2.16#038e6e17b695d20cac1478f4a0f76607cc1c6c90"
 
 [[package]]
 name = "quasar-audio"

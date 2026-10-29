@@ -2,8 +2,6 @@
 use crate::physics::{CollisionMap, Material, Vec2};
 use serde::Deserialize;
 use std::{
-    fs::File,
-    io::BufReader,
     path::{Path, PathBuf},
 };
 
@@ -285,18 +283,13 @@ pub struct Atlas {
     pub pixels: Vec<u8>,
 }
 impl Atlas {
-    fn load(path: &Path) -> Result<Self, String> {
-        let file = File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let mut decoder = png::Decoder::new(BufReader::new(file));
-        decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-        let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
-        let mut bytes = vec![0; reader.output_buffer_size()];
-        let info = reader.next_frame(&mut bytes).map_err(|e| e.to_string())?;
-        if info.width != 128 || info.height != 256 || info.color_type != png::ColorType::Rgba {
+    fn load(path: &classicclassics_assets::Directory) -> Result<Self, String> {
+        let image = path.image()?;
+        if image.width() != 128 || image.height() != 256 {
             return Err("tiles.png must be a 128x256 RGBA atlas".into());
         }
         let mut pixels = Vec::with_capacity(128 * 256);
-        for rgba in bytes[..info.buffer_size()].as_chunks::<4>().0.iter() {
+        for rgba in image.rgba().as_chunks::<4>().0.iter() {
             if rgba[0] != rgba[1] || rgba[0] != rgba[2] || rgba[0] % 85 != 0 {
                 return Err("tiles.png uses palette intensities 0, 85, 170, 255".into());
             }
@@ -313,7 +306,7 @@ impl Atlas {
 pub struct Assets {
     pub outcomes: crate::outcomes::Outcomes,
     pub presentation: crate::scenes::Presentation,
-    pub root: PathBuf,
+    pub root: classicclassics_assets::Directory,
     pub sprites: Vec<Sprite>,
     pub animations: Vec<Animation>,
     pub levels: Vec<Level>,
@@ -321,10 +314,11 @@ pub struct Assets {
     pub colors: Vec<u32>,
 }
 impl Assets {
-    pub fn load(root: &Path) -> Result<Self, String> {
-        let levels: LevelFile = read_json(&root.join("levels/levels.json"))?;
-        let sprites: SpriteFile = read_json(&root.join("graphics/sprites.json"))?;
-        let animations: AnimationFile = read_json(&root.join("graphics/animations.json"))?;
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
+        let levels: LevelFile = read_asset_json(&root.join("levels/levels.json"))?;
+        let sprites: SpriteFile = read_asset_json(&root.join("graphics/sprites.json"))?;
+        let animations: AnimationFile = read_asset_json(&root.join("graphics/animations.json"))?;
         for animation in &animations.animations {
             if animation.frames.is_empty()
                 || animation.loop_start >= animation.frames.len()
@@ -353,7 +347,7 @@ impl Assets {
                 return Err(format!("invalid sprite {}", sprite.kind));
             }
         }
-        let palette: PaletteFile = read_json(&root.join("graphics/palette.json"))?;
+        let palette: PaletteFile = read_asset_json(&root.join("graphics/palette.json"))?;
         if palette.colors.len() != 64 {
             return Err("palette must contain 64 colors".into());
         }
@@ -384,8 +378,8 @@ impl Assets {
         }
         Ok(Self {
             root: root.to_owned(),
-            presentation: crate::scenes::Presentation::load(root)?,
-            outcomes: crate::outcomes::Outcomes::load(root)?,
+            presentation: crate::scenes::Presentation::load(&root)?,
+            outcomes: crate::outcomes::Outcomes::load(&root)?,
             sprites: sprites.sprites,
             animations: animations.animations,
             levels: levels.levels,
@@ -400,11 +394,17 @@ impl Assets {
     }
 }
 pub fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
-    let file = File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    serde_json::from_reader(BufReader::new(file)).map_err(|e| format!("{}: {e}", path.display()))
+    use classicclassics_assets::AssetLocation;
+    let root = path.parent().ok_or("asset has no parent")?.open_assets()?;
+    let name = path.file_name().and_then(|s| s.to_str()).ok_or("asset filename is not UTF-8")?;
+    root.join(name).json()
 }
+fn read_asset_json<T: serde::de::DeserializeOwned>(path: &classicclassics_assets::Directory) -> Result<T, String> {
+    path.json()
+}
+
 pub fn default_root() -> PathBuf {
-    classicclassics_core::imported::asset_root("micromages", env!("CARGO_MANIFEST_DIR"))
+    classicclassics_assets::game_root("micromages", env!("CARGO_MANIFEST_DIR"))
 }
 
 #[derive(Clone, Debug, serde::Serialize, Deserialize)]

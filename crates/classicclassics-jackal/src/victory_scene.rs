@@ -2,23 +2,25 @@
 //!
 //! The recovered cinematic supplies scenery and labels. Counters remain live
 //! game data, so recordings never substitute captured scores for player progress.
-use crate::renderer::{Canvas, Rect, Texture};
+#[cfg(test)]
 use std::path::Path;
+use crate::renderer::{Canvas, Rect, Texture};
 
 pub struct VictoryScoreboard {
     digits: Texture,
 }
 impl VictoryScoreboard {
-    pub fn load(assets: &Path) -> Result<Self, String> {
+    pub fn load(assets: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let assets = assets.open_assets()?;
         let path = assets.join("cinematics/score_digits.png");
-        let image = image::open(&path)
+        let image = path.image()
             .map_err(|error| format!("{}: {error}", path.display()))?
-            .into_rgba8();
-        if image.dimensions() != (80, 8) {
+            ;
+        if (image.width(), image.height()) != (80, 8) {
             return Err("victory digit atlas must contain ten 8x8 digits".into());
         }
         Ok(Self {
-            digits: Texture::from_rgba(80, 8, image.into_raw())?,
+            digits: Texture::from_rgba(80, 8, image.rgba().to_vec())?,
         })
     }
     pub fn draw(

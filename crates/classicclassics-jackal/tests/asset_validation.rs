@@ -60,8 +60,7 @@ impl Fixture {
     }
     fn rejects(&self, message: &str) {
         let error = Assets::load(&self.0)
-            .err()
-            .expect("invalid asset accepted")
+            .expect_err("invalid asset accepted")
             .to_string();
         assert!(error.contains(message), "unexpected error: {error}");
     }

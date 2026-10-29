@@ -3,7 +3,6 @@ use crate::{math::Vec2, renderer::Texture};
 use serde::Deserialize;
 use std::{
     error::Error,
-    fs,
     path::{Path, PathBuf},
 };
 
@@ -156,6 +155,11 @@ pub struct Assets {
     pub destruction: Vec<DestructionDefinition>,
     pub title: Texture,
 }
+impl std::fmt::Debug for Assets {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Assets").field("levels", &self.levels.len()).finish_non_exhaustive()
+    }
+}
 impl Assets {
     pub fn default_directory() -> PathBuf {
         asset_directory(
@@ -168,7 +172,8 @@ impl Assets {
             std::env::current_exe().ok().as_deref(),
         )
     }
-    pub fn load(root: &Path) -> Result<Self, Box<dyn Error>> {
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, Box<dyn Error>> {
+        let root = root.open_assets()?;
         let mut levels = Vec::new();
         let mut tiles = Vec::new();
         let mut sprites = Vec::new();
@@ -331,17 +336,17 @@ impl Assets {
                 }
             }
         }
-        let (texture_phases, boss_patches) = crate::world_art::load(root)?;
+        let (texture_phases, boss_patches) = crate::world_art::load(&root)?;
         Ok(Self {
             texture_phases,
             boss_patches,
-            hud: crate::hud::Hud::load(root)?,
-            river_art: crate::river_art::RiverArt::load(root)?,
-            palette_cycle_art: crate::palette_cycle::PaletteCycleArt::load(root)?,
-            stage_three_water_art: crate::stage_three_water::StageThreeWaterArt::load(root)?,
-            headquarters_art: crate::hq_effects::CollapseArt::load(root)?,
-            cinematics: crate::cinematic::Cinematics::load(root)?,
-            scoreboard: crate::victory_scene::VictoryScoreboard::load(root)?,
+            hud: crate::hud::Hud::load(&root)?,
+            river_art: crate::river_art::RiverArt::load(&root)?,
+            palette_cycle_art: crate::palette_cycle::PaletteCycleArt::load(&root)?,
+            stage_three_water_art: crate::stage_three_water::StageThreeWaterArt::load(&root)?,
+            headquarters_art: crate::hq_effects::CollapseArt::load(&root)?,
+            cinematics: crate::cinematic::Cinematics::load(&root)?,
+            scoreboard: crate::victory_scene::VictoryScoreboard::load(&root)?,
             destruction,
             animations,
             levels,
@@ -383,37 +388,24 @@ impl Assets {
             .find(|patch| patch.stage == stage + 1 && patch.source_type == source_type)
     }
 }
-fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, Box<dyn Error>> {
-    let data = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+fn read_json<T: serde::de::DeserializeOwned>(path: &classicclassics_assets::Directory) -> Result<T, Box<dyn Error>> {
+    let data = path.read().map_err(|e| format!("{}: {e}", path.display()))?;
     serde_json::from_slice(&data).map_err(|e| format!("{}: {e}", path.display()).into())
 }
 /// An installed executable must never fall back to a build-machine checkout,
 /// even when its packaged assets are missing. Cargo builds retain source assets.
 fn asset_directory(app: Option<&Path>, install: Option<&Path>, exe: Option<&Path>) -> PathBuf {
-    if let Some(app) = app.filter(|p| !p.as_os_str().is_empty()) {
-        return app.join("games/jackal");
-    }
-    if let Some(install) = install.filter(|p| !p.as_os_str().is_empty()) {
-        return install.join("app/games/jackal");
-    }
-    if let Some(bin) = exe.and_then(Path::parent) {
-        if bin.file_name() == Some(std::ffi::OsStr::new("bin")) {
-            if let Some(app) = bin.parent() {
-                return app.join("games/jackal");
-            }
-        }
-    }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets")
+    classicclassics_assets::resolve_game_root("jackal", Path::new(env!("CARGO_MANIFEST_DIR")), app, install, exe)
 }
 
-fn load_png(path: &Path) -> Result<Texture, Box<dyn Error>> {
-    let image = image::open(path)
+fn load_png(path: &classicclassics_assets::Directory) -> Result<Texture, Box<dyn Error>> {
+    let image = path.image()
         .map_err(|e| format!("{}: {e}", path.display()))?
-        .into_rgba8();
+        ;
     Texture::from_rgba(
         image.width() as usize,
         image.height() as usize,
-        image.into_raw(),
+        image.rgba().to_vec(),
     )
     .map_err(Into::into)
 }

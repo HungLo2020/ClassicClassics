@@ -32,6 +32,12 @@ pub struct GameInfo {
 pub trait ArcadeGame: Default + Clone + std::fmt::Debug + Serialize + DeserializeOwned {
     type Record: Default + Clone + std::fmt::Debug + Serialize + DeserializeOwned;
     const INFO: GameInfo;
+    const ASSET_MANIFEST_DIR: Option<&'static str> = None;
+    /// The collection supplies a mounted namespace. Default remains a convenience
+    /// for procedural games and standalone simulation fixtures.
+    fn load(_assets: Option<&classicclassics_assets::Directory>) -> Result<Self, String> {
+        Ok(Self::default())
+    }
     const COVER: Option<&'static [u8]> = None;
     fn pixel_frame(&self, _hints: &ControlHints) -> Option<imported::PixelFrame> {
         None

@@ -1,17 +1,17 @@
 //! Original alternating river graphics, stored as native PNG upload phases.
 use crate::{hq_effects::ArtSequence, renderer::Texture};
-use std::path::Path;
 pub struct RiverArt {
     early: [ArtSequence; 3],
     late: [ArtSequence; 3],
 }
 impl RiverArt {
-    pub fn load(root: &Path) -> Result<Self, String> {
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
         let load = |period: &str| -> Result<[ArtSequence; 3], String> {
             Ok([
-                ArtSequence::load(root, &format!("river_{period}_initial"))?,
-                ArtSequence::load(root, &format!("river_{period}_0_1"))?,
-                ArtSequence::load(root, &format!("river_{period}_1_0"))?,
+                ArtSequence::load(&root, &format!("river_{period}_initial"))?,
+                ArtSequence::load(&root, &format!("river_{period}_0_1"))?,
+                ArtSequence::load(&root, &format!("river_{period}_1_0"))?,
             ])
         };
         Ok(Self {

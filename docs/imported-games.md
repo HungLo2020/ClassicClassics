@@ -22,11 +22,11 @@ short button taps are accumulated until a video frame consumes them. Pause and
 restart belong to the adapter, so the shared Settings overlay freezes every game.
 
 Original gameplay, collision, level data, enemies and pixel renderers are retained.
-Changes inside these modules are mechanical snapshot/clone/debug derives, asset
-path discovery, and replacing Micro Mages' static animation-name field with an
-owned string for deserialization. Level terrain damage is included in snapshots.
-Micro Mages' immutable assets are cached separately and restored when loading a
-snapshot. All mutable simulation state remains serializable without replaying an
+Integration changes include snapshot/clone/debug derives, shared Quasar asset
+loading, render pixel alignment, and replacing Micro Mages' static animation-name
+field with an owned string for deserialization. Level terrain damage is included in snapshots.
+Immutable assets are owned by each running game and restored when loading a
+standalone fixture snapshot. All mutable simulation state remains serializable without replaying an
 input log. Existing standalone device, storage and executable hosts are omitted.
 
 The original software renderers remain to preserve the recovered pixels. Each
@@ -40,13 +40,14 @@ Control hints and shared overlays remain ordinary Quasar draw lists. The old
 geometry-only `scene`/`reference_canvas` path exists for simulation reference tests;
 production hosts must use `Session::render`.
 
-Original PNG decoders stay with the software renderers so their recovered palette
-handling and pixel fixtures remain unchanged. Imported modules retain their source
+PNG decoding now uses the shared Quasar loader; game-specific palette conversion
+and pixel fixtures preserve the recovered rendering behavior. See [Shared assets](assets.md). Imported modules retain their source
 formatting and permit a few legacy Clippy style lints. Development builds optimize
 these CPU renderers and the core helpers, while host code remains debuggable.
 
-Micro Mages and Jackal emit asset cue data. Before the host starts its clock, the
-collection prepares short effects and WAV clips. Micro Mages' Ogg music uses
+Micro Mages and Jackal emit asset cue data. When a game is selected, the
+collection prepares only that game's short effects and WAV clips through Quasar
+asset handles, before its simulation clock advances. Micro Mages' Ogg music uses
 Quasar's bounded streaming decoder threads, keeping whole-track decoding off the
 simulation thread. Playback never synchronously loads/decodes a missing clip.
 Music stops at the catalog and pauses with Settings or the game. Source loop

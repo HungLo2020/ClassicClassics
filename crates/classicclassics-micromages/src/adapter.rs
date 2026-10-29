@@ -14,16 +14,10 @@ pub struct Record {
 }
 
 pub(crate) fn assets() -> std::sync::Arc<crate::assets::Assets> {
-    static ASSETS: std::sync::OnceLock<std::sync::Arc<crate::assets::Assets>> =
-        std::sync::OnceLock::new();
-    ASSETS
-        .get_or_init(|| {
-            std::sync::Arc::new(
-                crate::assets::Assets::load(&crate::assets::default_root())
-                    .expect("packaged Micro Mages assets"),
-            )
-        })
-        .clone()
+    std::sync::Arc::new(
+        crate::assets::Assets::load(&crate::assets::default_root())
+            .expect("Micro Mages fixture assets"),
+    )
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -46,8 +40,26 @@ impl Default for Game {
         }
     }
 }
+impl Game {
+    fn with_assets(assets: std::sync::Arc<crate::assets::Assets>) -> Self {
+        Self {
+            engine: crate::game::Game::new(assets),
+            clock: Default::default(),
+            pending: Default::default(),
+            paused: false,
+            frame_cache: Default::default(),
+        }
+    }
+}
 impl ArcadeGame for Game {
     type Record = Record;
+    const ASSET_MANIFEST_DIR: Option<&'static str> = Some(env!("CARGO_MANIFEST_DIR"));
+    fn load(root: Option<&classicclassics_assets::Directory>) -> Result<Self, String> {
+        let root = root.ok_or("Micro Mages asset mount missing")?;
+        Ok(Self::with_assets(std::sync::Arc::new(
+            crate::assets::Assets::load(root)?,
+        )))
+    }
     const COVER: Option<&'static [u8]> = Some(include_bytes!("../assets/basalt/cover.png"));
     fn paused(&self) -> bool {
         self.paused
@@ -60,7 +72,7 @@ impl ArcadeGame for Game {
     };
     fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         if input.restart {
-            *self = Self::default();
+            *self = Self::with_assets(self.engine.assets().clone());
             sounds.push(Sound::Asset(
                 classicclassics_core::audio::AssetSound::StopMusic,
             ));
@@ -147,7 +159,11 @@ impl ArcadeGame for Game {
         }
         let image = self.frame_cache.image(|| {
             let mut renderer = crate::video::Video::new();
-            (renderer.render(&self.engine, &assets()).to_vec(), 256, 240)
+            (
+                renderer.render(&self.engine, self.engine.assets()).to_vec(),
+                256,
+                240,
+            )
         });
         Some(PixelFrame {
             image,

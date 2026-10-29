@@ -14,6 +14,9 @@ macro_rules! games {
             pub fn info(self) -> &'static GameInfo {
                 match self { $(Self::$variant => &$game::Game::INFO,)+ }
             }
+            pub fn asset_manifest_dir(self) -> Option<&'static str> {
+                match self { $(Self::$variant => $game::Game::ASSET_MANIFEST_DIR,)+ }
+            }
             pub fn cover(self) -> Option<&'static [u8]> {
                 match self { $(Self::$variant => $game::Game::COVER,)+ }
             }
@@ -41,6 +44,9 @@ macro_rules! games {
         impl Game {
             pub fn new(kind: GameKind) -> Self {
                 match kind { $(GameKind::$variant => Self::$variant(Box::default()),)+ }
+            }
+            pub fn load(kind: GameKind, root: Option<&classicclassics_assets::Directory>) -> Result<Self, String> {
+                match kind { $(GameKind::$variant => $game::Game::load(root).map(|game| Self::$variant(Box::new(game))),)+ }
             }
             pub fn kind(&self) -> GameKind {
                 match self { $(Self::$variant(_) => GameKind::$variant,)+ }

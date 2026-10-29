@@ -1,7 +1,6 @@
 //! Native artwork and explosion positions for the headquarters collapse.
 use crate::{math::Vec2, renderer::Texture};
 use serde::Deserialize;
-use std::path::Path;
 #[derive(Deserialize)]
 struct SourcePhase {
     tick_offset: u16,
@@ -23,9 +22,10 @@ pub(crate) struct ArtSequence {
     cues: Vec<Cue>,
 }
 impl ArtSequence {
-    pub(crate) fn load(root: &Path, scene: &str) -> Result<Self, String> {
+    pub(crate) fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized), scene: &str) -> Result<Self, String> {
+        let root = root.open_assets()?;
         let source: Source = serde_json::from_slice(
-            &std::fs::read(root.join(format!("textures/{scene}/timeline.json"))).map_err(|e| {
+            &root.join(format!("textures/{scene}/timeline.json")).read().map_err(|e| {
                 format!(
                     "{}: {e}",
                     root.join(format!("textures/{scene}/timeline.json"))
@@ -37,13 +37,13 @@ impl ArtSequence {
         let mut phases = Vec::new();
         for phase in source.phases {
             let load = |name: String, size: (u32, u32)| -> Result<Texture, String> {
-                let image = image::open(root.join(&name))
+                let image = root.join(&name).image()
                     .map_err(|e| format!("{}: {e}", root.join(&name).display()))?
-                    .to_rgba8();
-                if image.dimensions() != size {
+                    ;
+                if (image.width(), image.height()) != size {
                     return Err("Invalid headquarters atlas size".into());
                 }
-                Texture::from_rgba(size.0 as usize, size.1 as usize, image.into_raw())
+                Texture::from_rgba(size.0 as usize, size.1 as usize, image.rgba().to_vec())
             };
             if phases
                 .last()
@@ -104,11 +104,12 @@ pub struct CollapseArt {
     initial_building: ArtSequence,
 }
 impl CollapseArt {
-    pub fn load(root: &Path) -> Result<Self, String> {
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
         Ok(Self {
-            center: ArtSequence::load(root, "hq_collapse")?,
-            final_collapse: ArtSequence::load(root, "hq_final")?,
-            initial_building: ArtSequence::load(root, "hq_building_initial_0")?,
+            center: ArtSequence::load(&root, "hq_collapse")?,
+            final_collapse: ArtSequence::load(&root, "hq_final")?,
+            initial_building: ArtSequence::load(&root, "hq_building_initial_0")?,
             building: [
                 (3, 0),
                 (0, 1),
@@ -124,7 +125,7 @@ impl CollapseArt {
                 Ok((
                     previous,
                     phase,
-                    ArtSequence::load(root, &format!("hq_building_{previous}_{phase}"))?,
+                    ArtSequence::load(&root, &format!("hq_building_{previous}_{phase}"))?,
                 ))
             })
             .collect::<Result<_, String>>()?,

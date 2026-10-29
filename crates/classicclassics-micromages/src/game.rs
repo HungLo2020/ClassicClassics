@@ -38,6 +38,7 @@ pub struct Game {
     transition_ticks: u16,
 }
 impl Game {
+    pub(crate) fn assets(&self) -> &Arc<Assets> { &self.assets }
     pub fn new(assets: Arc<Assets>) -> Self {
         Self {
             screen: Screen::Intro,

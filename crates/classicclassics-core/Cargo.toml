@@ -7,5 +7,6 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+classicclassics-assets.workspace = true
 quasar-render-2d.workspace = true
 serde.workspace = true

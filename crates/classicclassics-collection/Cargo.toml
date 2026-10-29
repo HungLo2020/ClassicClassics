@@ -11,6 +11,8 @@ default = []
 audio = ["quasar-audio/native"]
 
 [dependencies]
+classicclassics-assets.workspace = true
+quasar-assets.workspace = true
 quasar-ui.workspace = true
 classicclassics-core.workspace = true
 classicclassics-pong.workspace = true

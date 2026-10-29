@@ -13,6 +13,7 @@ suite covers:
 
 - imported upstream simulation, rendering, campaign and replay regression suites;
 - adapter/original state equivalence for movement, multiplayer, grenades and batteries;
+- shared Quasar mounts/cache, missing/corrupt asset recovery and gameplay/restart without asset reads;
 - imported clock cadence, buffered taps, pause/restart and original audio decoding;
 
 - deterministic autoplay for each game (finite state, scoring, collisions);

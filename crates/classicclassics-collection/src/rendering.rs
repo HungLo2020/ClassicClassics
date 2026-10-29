@@ -25,14 +25,18 @@ pub struct SceneAssets {
 }
 impl SceneAssets {
     pub fn new() -> Result<Self> {
+        Self::with_assets(&mut crate::assets::GameAssets::default())
+    }
+    pub fn with_assets(resources: &mut crate::assets::GameAssets) -> Result<Self> {
+        let catalog = resources.catalog()?;
         let mut assets = Self {
             textures: Textures::default(),
             artwork: CatalogArt::default(),
             frame: None,
         };
         for kind in GameKind::ALL {
-            if let Some(bytes) = kind.cover() {
-                let image = Image::decode_png(bytes)?;
+            if kind.cover().is_some() {
+                let image = catalog.join(format!("{}.png", kind.number())).image()?;
                 let id = assets.textures.insert(image);
                 assets.artwork.0.insert(kind.number(), id);
             }

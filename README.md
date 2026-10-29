@@ -188,6 +188,7 @@ Shared library code lives under `crates/`:
 
 | Crate | Responsibility |
 |---|---|
+| `classicclassics-assets` | Shared Quasar asset mounts, typed image/audio loading and bounded cache |
 | `classicclassics-core` | Game interface, input frames, sound events, HUD hints, drawing and simulation helpers |
 | `classicclassics-collection` | Game registration, catalog, settings, controls, persistence and Quasar audio |
 | `classicclassics-pong` | Pong simulation, rendering, records and catalog artwork |
@@ -198,8 +199,9 @@ Shared library code lives under `crates/`:
 | `classicclassics-missile-command` | Imported Missile Command simulation, pixels and collection adapter |
 | `classicclassics-river-raid` | Imported River Raid simulation, pixels and collection adapter |
 
-Every game depends on the core API and Quasar's headless draw lists; it does not
-know about the application, other games or filesystem persistence. Versions and
+Every game depends on the core API and Quasar's headless draw lists. File-backed
+games also use the shared asset API; the collection supplies their mounts. Games
+do not know about the application, other games or filesystem persistence. Versions and
 Quasar dependencies are defined once in the root manifest. All crates are default
 workspace members, so the normal test and Clippy commands cover the collection.
 See [Adding a game](docs/adding-a-game.md) for the extension workflow.
@@ -210,6 +212,7 @@ Nothing in the game loop is hand-rolled infrastructure:
 
 | Quasar crate | Used for |
 |---|---|
+| `quasar-assets` | Read-only game/embedded mounts, typed loaders, handles and bounded caching |
 | `quasar-core` | Fixed 120 Hz step and shared viewport/scaling types |
 | `quasar-window` | Native window, desktop identity, keyboard/mouse state, winit events |
 | `quasar-input` | Named actions, bindings, edge detection, deadzones, controller hotplug |
@@ -287,6 +290,7 @@ python3 DevUtils/verify_package.py dist/ClassicClassics-*-linux-x64.zip
 ## Documentation
 
 - [Adding a game](docs/adding-a-game.md) — crate contract and registration
+- [Shared assets](docs/assets.md) — Quasar mounts, loading, ownership and recovery
 - [Architecture](docs/architecture.md) — simulation, rendering, input and host boundaries
 - [Basalt compliance](docs/basalt-compliance.md) — the standard's checklist, item by item
 - [Imported games](docs/imported-games.md) — source provenance, adapters, controls and assets

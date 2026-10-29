@@ -123,51 +123,55 @@ fn noise(seconds: f32, gain: f32, seed: u32) -> Clip {
 #[cfg(feature = "audio")]
 #[derive(Clone)]
 enum LoadedSound {
-    Clip(Clip),
-    Stream(quasar_audio::StreamSource),
+    Clip(classicclassics_assets::Handle<classicclassics_assets::AudioClip>),
+    Stream(classicclassics_assets::Handle<classicclassics_assets::AudioStream>),
 }
 
 #[cfg(feature = "audio")]
-fn load_imported_sounds() -> std::collections::HashMap<(&'static str, &'static str), LoadedSound> {
+fn load_imported_sounds(
+    root: &classicclassics_assets::Directory,
+    kind: crate::GameKind,
+) -> Result<SoundMap, String> {
+    use classicclassics_assets::{ClipLoader, StreamLoader};
     use classicclassics_core::{Sound, audio::AssetSound};
-    let mut sounds = std::collections::HashMap::new();
-    let micro = classicclassics_micromages::assets::default_root();
-    for (file, _, _, _) in classicclassics_micromages::audio_cues::MUSIC {
-        match quasar_audio::StreamSource::from_path(micro.join(file)) {
-            Ok(stream) => {
-                sounds.insert(("micromages", file), LoadedSound::Stream(stream));
+    let mut sounds = SoundMap::new();
+    match kind {
+        crate::GameKind::MicroMages => {
+            for (file, _, _, _) in classicclassics_micromages::audio_cues::MUSIC {
+                sounds.insert(
+                    ("micromages", file),
+                    LoadedSound::Stream(root.join(file).load::<StreamLoader>()?),
+                );
             }
-            Err(error) => eprintln!("Cannot open micromages/{file}: {error}"),
+            for (file, _) in classicclassics_micromages::audio_cues::SFX {
+                sounds.insert(
+                    ("micromages", file),
+                    LoadedSound::Clip(root.join(file).load::<ClipLoader>()?),
+                );
+            }
         }
-    }
-    for (file, _) in classicclassics_micromages::audio_cues::SFX {
-        match Clip::load(micro.join(file)) {
-            Ok(clip) => {
-                sounds.insert(("micromages", file), LoadedSound::Clip(clip));
-            }
-            Err(error) => eprintln!("Cannot decode micromages/{file}: {error}"),
-        }
-    }
-    let jackal = classicclassics_jackal::assets::Assets::default_directory();
-    for id in 0..=0x59 {
-        if let Some(Sound::Asset(
-            AssetSound::Music { file, .. } | AssetSound::Effect { file, .. },
-        )) = classicclassics_jackal::sound::cue(
-            classicclassics_jackal::game::GameEvent::AudioCommand(id),
-        ) {
-            if sounds.contains_key(&("jackal", file)) {
-                continue;
-            }
-            match Clip::load(jackal.join(file)) {
-                Ok(clip) => {
-                    sounds.insert(("jackal", file), LoadedSound::Clip(clip));
+        crate::GameKind::Jackal => {
+            for id in 0..=0x59 {
+                if let Some(Sound::Asset(
+                    AssetSound::Music { file, .. } | AssetSound::Effect { file, .. },
+                )) = classicclassics_jackal::sound::cue(
+                    classicclassics_jackal::game::GameEvent::AudioCommand(id),
+                ) && !sounds.contains_key(&("jackal", file))
+                {
+                    sounds.insert(
+                        ("jackal", file),
+                        LoadedSound::Clip(root.join(file).load::<ClipLoader>()?),
+                    );
                 }
-                Err(error) => eprintln!("Cannot decode jackal/{file}: {error}"),
             }
         }
+        _ => {}
     }
-    sounds
+    Ok(sounds)
 }
+
+#[cfg(feature = "audio")]
+type SoundMap = std::collections::HashMap<(&'static str, &'static str), LoadedSound>;
 
 #[cfg(feature = "audio")]
 pub struct Audio {
@@ -176,7 +180,7 @@ pub struct Audio {
     muted: bool,
     music_bus: quasar_audio::BusId,
     music: std::cell::RefCell<Option<(&'static str, &'static str, quasar_audio::VoiceHandle)>>,
-    clips: std::collections::HashMap<(&'static str, &'static str), LoadedSound>,
+    clips: SoundMap,
 }
 
 #[cfg(feature = "audio")]
@@ -209,8 +213,25 @@ impl Audio {
             music_bus,
             music: Default::default(),
             // Decode before the host starts its clock; playback performs no file I/O.
-            clips: load_imported_sounds(),
+            clips: SoundMap::new(),
         })
+    }
+
+    /// Called once at a game boundary, before its clock starts. Playback and
+    /// the device callback only use prepared handles, never filesystem loaders.
+    pub fn prepare(
+        &mut self,
+        kind: Option<crate::GameKind>,
+        assets: &mut crate::assets::GameAssets,
+    ) -> Result<(), String> {
+        self.play_asset(classicclassics_core::audio::AssetSound::StopMusic);
+        self.clips.clear();
+        if let Some(kind) = kind
+            && let Some(root) = assets.game(kind)?
+        {
+            self.clips = load_imported_sounds(&root, kind)?;
+        }
+        Ok(())
     }
 
     pub fn play(&self, sound: Sound, bank: &SoundBank, pan: f32) {
@@ -257,8 +278,8 @@ impl Audio {
             return;
         };
         let (sample_rate, frames) = match source {
-            LoadedSound::Clip(clip) => (clip.sample_rate(), clip.frames()),
-            LoadedSound::Stream(stream) => (stream.sample_rate(), u64::MAX),
+            LoadedSound::Clip(clip) => (clip.0.sample_rate(), clip.0.frames()),
+            LoadedSound::Stream(stream) => (stream.0.sample_rate(), u64::MAX),
         };
         let loop_mode = match region {
             None | Some(MusicLoop::Once) => quasar_audio::LoopMode::None,
@@ -293,8 +314,8 @@ impl Audio {
             ..Default::default()
         };
         let result = match source {
-            LoadedSound::Clip(clip) => self.engine.play(clip.clone(), config),
-            LoadedSound::Stream(stream) => self.engine.play_stream(stream.clone(), config),
+            LoadedSound::Clip(clip) => self.engine.play(clip.0.clone(), config),
+            LoadedSound::Stream(stream) => self.engine.play_stream(stream.0.clone(), config),
         };
         if let Ok(handle) = result
             && region.is_some()
@@ -332,6 +353,13 @@ impl Audio {
     pub fn open(_: bool, _: f32, _: Option<&str>) -> Option<Self> {
         None
     }
+    pub fn prepare(
+        &mut self,
+        _: Option<crate::GameKind>,
+        _: &mut crate::assets::GameAssets,
+    ) -> Result<(), String> {
+        Ok(())
+    }
     pub fn play(&self, _: Sound, _: &SoundBank, _: f32) {}
     pub fn pause_music(&self, _: bool) {}
     pub fn set_muted(&mut self, _: bool) {}
@@ -347,9 +375,11 @@ mod tests {
 
     #[cfg(feature = "audio")]
     #[test]
-    fn imported_audio_is_prepared_before_play_and_music_uses_quasar_streams() {
+    fn selected_game_audio_uses_shared_asset_handles_and_quasar_streams() {
         use classicclassics_core::{Sound, audio::AssetSound};
-        let sounds = load_imported_sounds();
+        let mut assets = crate::assets::GameAssets::default();
+        let root = assets.game(crate::GameKind::MicroMages).unwrap().unwrap();
+        let sounds = load_imported_sounds(&root, crate::GameKind::MicroMages).unwrap();
         for (file, _, _, _) in classicclassics_micromages::audio_cues::MUSIC {
             assert!(matches!(
                 sounds.get(&("micromages", file)),
@@ -362,6 +392,9 @@ mod tests {
                 Some(LoadedSound::Clip(_))
             ));
         }
+        let root = assets.game(crate::GameKind::Jackal).unwrap().unwrap();
+        let sounds = load_imported_sounds(&root, crate::GameKind::Jackal).unwrap();
+        assert!(sounds.keys().all(|(game, _)| *game == "jackal"));
         for id in 0..=0x59 {
             if let Some(Sound::Asset(
                 AssetSound::Music { file, .. } | AssetSound::Effect { file, .. },

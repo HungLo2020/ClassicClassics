@@ -13,16 +13,17 @@ pub struct Record {
     pub best_level: u32,
 }
 
-fn assets() -> &'static crate::assets::Assets {
-    static ASSETS: std::sync::OnceLock<crate::assets::Assets> = std::sync::OnceLock::new();
-    ASSETS.get_or_init(|| {
+fn assets() -> std::sync::Arc<crate::assets::Assets> {
+    std::sync::Arc::new(
         crate::assets::Assets::load(&crate::assets::Assets::default_directory())
-            .expect("packaged Jackal assets")
-    })
+            .expect("Jackal fixture assets"),
+    )
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Game {
+    #[serde(skip, default = "assets")]
+    assets: std::sync::Arc<crate::assets::Assets>,
     pub engine: crate::game::Game,
     clock: VideoClock,
     pending: Input,
@@ -32,9 +33,13 @@ pub struct Game {
 }
 impl Default for Game {
     fn default() -> Self {
-        // Prepare static assets during launch, never on the first gameplay draw.
-        assets();
+        Self::with_assets(assets())
+    }
+}
+impl Game {
+    fn with_assets(assets: std::sync::Arc<crate::assets::Assets>) -> Self {
         Self {
+            assets,
             engine: Default::default(),
             clock: Default::default(),
             pending: Default::default(),
@@ -45,6 +50,12 @@ impl Default for Game {
 }
 impl ArcadeGame for Game {
     type Record = Record;
+    const ASSET_MANIFEST_DIR: Option<&'static str> = Some(env!("CARGO_MANIFEST_DIR"));
+    fn load(root: Option<&classicclassics_assets::Directory>) -> Result<Self, String> {
+        let root = root.ok_or("Jackal asset mount missing")?;
+        let assets = crate::assets::Assets::load(root).map_err(|e| e.to_string())?;
+        Ok(Self::with_assets(std::sync::Arc::new(assets)))
+    }
     const COVER: Option<&'static [u8]> = Some(include_bytes!("../assets/basalt/cover.png"));
     fn paused(&self) -> bool {
         self.paused
@@ -57,7 +68,7 @@ impl ArcadeGame for Game {
     };
     fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         if input.restart {
-            *self = Self::default();
+            *self = Self::with_assets(self.assets.clone());
             sounds.push(Sound::Asset(
                 classicclassics_core::audio::AssetSound::StopMusic,
             ));
@@ -101,7 +112,7 @@ impl ArcadeGame for Game {
                 select: input.mode,
                 pause: false,
             },
-            assets(),
+            &self.assets,
         );
         for event in self.engine.drain_events() {
             if let Some(sound) = crate::sound::cue(event) {
@@ -134,7 +145,11 @@ impl ArcadeGame for Game {
         );
         let image = self.frame_cache.image(|| {
             let mut renderer = crate::renderer::Renderer::new();
-            (renderer.render(&self.engine, assets()).to_vec(), 256, 240)
+            (
+                renderer.render(&self.engine, &self.assets).to_vec(),
+                256,
+                240,
+            )
         });
         Some(PixelFrame {
             image,

@@ -40,7 +40,7 @@ pub struct SavePolicy {
 
 pub fn run(
     options: Options,
-    session: Session,
+    mut session: Session,
     paths: GamePaths,
     save: SavePolicy,
 ) -> classicclassics_collection::Result {
@@ -56,12 +56,15 @@ pub fn run(
         options.audio_device.as_deref(),
     );
     if let Some(audio) = &mut audio {
+        if let Err(error) = audio.prepare(session.game_kind(), &mut session.assets) {
+            session.asset_failure(error);
+        }
         audio.set_muted(settings.muted);
     }
     let profile = options.smoke_frames.map(|_| NativeProfile::default());
     let mut app = App {
         presenter: None,
-        assets: SceneAssets::new()?,
+        assets: SceneAssets::with_assets(&mut session.assets)?,
         pixel_texture: None,
         profile,
         window: None,
@@ -1056,8 +1059,17 @@ impl ApplicationHandler for App {
                     });
             }
             let previous_game = self.session.game_kind();
+            let previous_error = self.session.asset_error.is_some();
             let quit = self.session.tick(input);
-            if self.session.game_kind() != previous_game {
+            if self.session.game_kind() != previous_game
+                || (!previous_error && self.session.asset_error.is_some())
+            {
+                if let Some(audio) = &mut self.audio
+                    && let Err(error) =
+                        audio.prepare(self.session.game_kind(), &mut self.session.assets)
+                {
+                    self.session.asset_failure(error);
+                }
                 // Static asset preparation is launch time, not elapsed gameplay.
                 // Do not fast-forward a new game to catch up with loading.
                 self.clock.reset();

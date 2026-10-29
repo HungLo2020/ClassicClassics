@@ -20,6 +20,8 @@ pub enum Screen {
 
 pub struct Session {
     pub screen: Screen,
+    pub assets: crate::assets::GameAssets,
+    pub asset_error: Option<String>,
     pub settings_screen: Option<SettingsScreen>,
     pub controls: Controls,
     pub controls_screen: Option<ControlsScreen>,
@@ -33,6 +35,8 @@ impl Session {
     pub fn new(records: Records, settings: Settings) -> Self {
         Self {
             screen: Screen::Menu,
+            assets: Default::default(),
+            asset_error: None,
             settings_screen: None,
             controls: Controls::default(),
             controls_screen: None,
@@ -76,11 +80,26 @@ impl Session {
             .iter()
             .position(|candidate| *candidate == kind)
             .unwrap_or(0);
-        self.screen = Screen::Game(Game::new(kind));
+        self.asset_error = None;
+        let result = self
+            .assets
+            .game(kind)
+            .and_then(|root| Game::load(kind, root.as_ref()));
+        match result {
+            Ok(game) => self.screen = Screen::Game(game),
+            Err(error) => self.asset_failure(format!("{}: {error}", kind.name())),
+        }
         self.sounds.push(Sound::Asset(
             classicclassics_core::audio::AssetSound::StopMusic,
         ));
         self.sounds.push(Sound::MenuSelect);
+    }
+
+    pub fn asset_failure(&mut self, error: String) {
+        eprintln!("Cannot load game: {error}");
+        self.screen = Screen::Menu;
+        self.asset_error = Some(error);
+        let _ = self.assets.store.clear_cache();
     }
 
     /// Advances one fixed tick. Returns true when the application should quit.
@@ -120,6 +139,7 @@ impl Session {
                         game.record(&mut self.records);
                     }
                     self.screen = Screen::Menu;
+                    let _ = self.assets.store.clear_cache();
                     self.settings_screen = None;
                     self.sounds.push(Sound::Asset(
                         classicclassics_core::audio::AssetSound::StopMusic,
@@ -139,6 +159,14 @@ impl Session {
             self.sounds.push(Sound::MenuSelect);
             return false;
         }
+        if self.asset_error.is_some() {
+            if input.back {
+                self.asset_error = None;
+            } else if input.confirm {
+                self.launch(GameKind::ALL[self.selected]);
+            }
+            return false;
+        }
         match &mut self.screen {
             Screen::Menu => {
                 if input.back {
@@ -151,11 +179,7 @@ impl Session {
                 }
                 if input.confirm {
                     let kind = GameKind::ALL[self.selected];
-                    self.screen = Screen::Game(Game::new(kind));
-                    self.sounds.push(Sound::Asset(
-                        classicclassics_core::audio::AssetSound::StopMusic,
-                    ));
-                    self.sounds.push(Sound::MenuSelect);
+                    self.launch(kind);
                 }
                 false
             }
@@ -163,6 +187,7 @@ impl Session {
                 if input.back {
                     game.record(&mut self.records);
                     self.screen = Screen::Menu;
+                    let _ = self.assets.store.clear_cache();
                     self.sounds.push(Sound::Asset(
                         classicclassics_core::audio::AssetSound::StopMusic,
                     ));
@@ -217,6 +242,38 @@ impl Session {
     }
 
     fn overlay(&mut self, base: Canvas) -> Canvas {
+        let base = if let Some(error) = &self.asset_error {
+            let mut paint = crate::paint::Paint::over(base);
+            paint.rect(160.0, 280.0, 1600.0, 460.0, [18, 20, 34, 255]);
+            paint.text(
+                210.0,
+                320.0,
+                "COULD NOT LOAD GAME",
+                3.0,
+                [255, 180, 150, 255],
+            );
+            let chars: Vec<_> = error.to_uppercase().chars().collect();
+            for (row, line) in chars.chunks(100).take(7).enumerate() {
+                let text: String = line.iter().collect();
+                paint.text(
+                    210.0,
+                    385.0 + row as f32 * 34.0,
+                    &text,
+                    2.0,
+                    [230, 233, 245, 255],
+                );
+            }
+            paint.text(
+                210.0,
+                675.0,
+                "ENTER: RETRY    BACKSPACE: RETURN TO CATALOG",
+                2.0,
+                [230, 233, 245, 255],
+            );
+            paint.into_canvas()
+        } else {
+            base
+        };
         let hints = self.controls.hints();
         if let Some(screen) = &mut self.controls_screen {
             return screen.scene(base);
@@ -268,9 +325,11 @@ impl Session {
             records: &'a Records,
             settings: &'a Settings,
             game: Option<&'a Game>,
+            asset_error: &'a Option<String>,
         }
         serde_json::to_value(State {
             version: 1,
+            asset_error: &self.asset_error,
             screen: if self.settings_screen.is_some() {
                 "settings"
             } else {

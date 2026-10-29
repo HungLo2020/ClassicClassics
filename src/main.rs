@@ -116,6 +116,9 @@ fn run() -> classicclassics_collection::Result {
 }
 
 fn run_headless(options: &Options, session: &mut Session) -> classicclassics_collection::Result {
+    if let Some(error) = &session.asset_error {
+        return Err(error.clone().into());
+    }
     let ticks = options.ticks.unwrap_or(600);
     for _ in 0..ticks {
         let input = if options.autoplay {
@@ -132,7 +135,8 @@ fn run_headless(options: &Options, session: &mut Session) -> classicclassics_col
         {
             std::fs::create_dir_all(parent)?;
         }
-        let mut assets = classicclassics_collection::rendering::SceneAssets::new()?;
+        let mut assets =
+            classicclassics_collection::rendering::SceneAssets::with_assets(&mut session.assets)?;
         let canvas = session.render(&mut assets)?;
         let pixels = quasar_render_2d::reference::rasterize(&canvas, &assets.textures)?;
         quasar_render_2d::write_png(path, canvas.width(), canvas.height(), &pixels)?;

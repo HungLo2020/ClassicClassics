@@ -1,9 +1,10 @@
 //! Original bottom-of-screen score and reserve-life display.
+#[cfg(test)]
+use std::path::Path;
 use crate::{
     player::Player,
     renderer::{Canvas, Rect, Texture},
 };
-use std::path::Path;
 
 pub struct HudPiece<'a> {
     pub texture: &'a Texture,
@@ -15,15 +16,16 @@ pub struct Hud {
     font: Texture,
 }
 impl Hud {
-    pub fn load(root: &Path) -> Result<Self, String> {
-        let image = image::open(root.join("fonts/hud.png"))
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
+        let image = root.join("fonts/hud.png").image()
             .map_err(|e| e.to_string())?
-            .into_rgba8();
-        if image.dimensions() != (96, 16) {
+            ;
+        if (image.width(), image.height()) != (96, 16) {
             return Err("HUD font must contain twelve 8 by 16 glyphs".into());
         }
         Ok(Self {
-            font: Texture::from_rgba(96, 16, image.into_raw())?,
+            font: Texture::from_rgba(96, 16, image.rgba().to_vec())?,
         })
     }
     #[cfg(test)]

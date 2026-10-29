@@ -1,10 +1,11 @@
 # Architecture
 
-Classic Classics is a Cargo workspace with ten crates, including one executable.
+Classic Classics is a Cargo workspace with eleven crates, including one executable.
 
 | Package | Location | Responsibility |
 |---|---|---|
 | `classicclassics` | `src/` | Native window/event loop and headless command-line host |
+| `classicclassics-assets` | `crates/classicclassics-assets/` | Quasar mounts, typed loading, asset handles and cache |
 | `classicclassics-core` | `crates/classicclassics-core/` | `ArcadeGame`, `GameInfo`, input, sound events, HUD hints, vector drawing, RNG and particles |
 | `classicclassics-collection` | `crates/classicclassics-collection/` | Registration, session, catalog, settings overlay, bindings, persistence and audio synthesis |
 | `classicclassics-pong` | `crates/classicclassics-pong/` | Pong and its record schema/catalog motif |
@@ -16,7 +17,8 @@ Classic Classics is a Cargo workspace with ten crates, including one executable.
 | `classicclassics-river-raid` | `crates/classicclassics-river-raid/` | Original River Raid simulation, renderer and adapter |
 
 The dependency direction is host → collection → games → core. Each game depends
-only on core, Serde and Quasar's draw-list API. Games never depend on each other,
+on core, Serde and Quasar's draw-list API; file-backed games also use the
+shared asset crate. Games never depend on each other,
 windowing, storage or device backends. Core is independent of all game crates.
 The host's `desktop`, `gamepad` and `audio` features enable platform backends;
 the collection's `audio` feature only adds native audio output.
@@ -176,7 +178,7 @@ the GPU. Settings are written to `data/config/display.toml` on a normal exit.
 
 `classicclassics-collection/src/audio.rs` synthesises the collection's generated
 effects into Quasar clips. Micro Mages and Jackal retain original music/effect
-assets, prepared before the clock starts; Ogg music streams through Quasar decoder threads. Shared music and effects
+assets, prepared for the selected game through the shared asset service before its clock starts; Ogg music streams through Quasar decoder threads. Shared music and effects
 buses honor volume and mute; music pauses with Settings and stops at the catalog.
 A missing native output device is not fatal. Game crates only emit cue data.
 See [Imported games](imported-games.md) for the compatibility rendering adapter,
@@ -210,3 +212,6 @@ The binary prints `classicclassics: <reason>` to standard error and exits
 non-zero on a fatal error. A normal quit, including **Q** or **Backspace** in the
 catalog, exits zero. Invalid saved settings are reported once, preserved, and
 replaced in memory by defaults.
+
+Asset ownership, loading boundaries and recoverable failures are documented in
+[Shared assets](assets.md).

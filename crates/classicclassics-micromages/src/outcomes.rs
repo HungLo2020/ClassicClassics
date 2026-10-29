@@ -1,6 +1,5 @@
 //! Native outcome artwork. Player scores and menu choices remain live Rust UI.
 use crate::scenes::Timeline;
-use std::{fs::File, io::BufReader, path::Path};
 
 pub struct Outcomes {
     game_over: Timeline,
@@ -9,24 +8,15 @@ pub struct Outcomes {
     pixels: Vec<u32>,
 }
 impl Outcomes {
-    pub fn load(root: &Path) -> Result<Self, String> {
-        let root = root.join("presentation/outcomes");
-        let mut decoder = png::Decoder::new(BufReader::new(
-            File::open(root.join("outcomes.png")).map_err(|e| e.to_string())?,
-        ));
-        decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-        let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
-        let mut bytes = vec![0; reader.output_buffer_size()];
-        let info = reader.next_frame(&mut bytes).map_err(|e| e.to_string())?;
-        if info.color_type != png::ColorType::Rgb || info.width != 512 || info.height % 8 != 0 {
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?.join("presentation/outcomes");
+        let image = root.join("outcomes.png").image()?;
+        if image.width() != 512 || image.height() % 8 != 0 {
             return Err("invalid outcome PNG atlas".into());
         }
-        let count = info.width * info.height / 64;
+        let count = image.width() * image.height() / 64;
         let read = |name: &str| -> Result<Timeline, String> {
-            let timeline: Timeline = serde_json::from_reader(
-                File::open(root.join(format!("{name}.json"))).map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?;
+            let timeline: Timeline = root.join(format!("{name}.json")).json()?;
             if timeline.width != 256
                 || timeline.height != 240
                 || timeline.tile_size != 8
@@ -53,12 +43,7 @@ impl Outcomes {
             hard: (1..=4)
                 .map(|n| read(&format!("hard-ending-{n}")))
                 .collect::<Result<_, _>>()?,
-            pixels: bytes[..info.buffer_size()]
-                .as_chunks::<3>()
-                .0
-                .iter()
-                .map(|c| u32::from(c[0]) << 16 | u32::from(c[1]) << 8 | u32::from(c[2]))
-                .collect(),
+            pixels: crate::scenes::rgb_pixels(&image),
         })
     }
     pub fn draw_icon(&self, player: usize, active: bool, x: usize, y: usize, output: &mut [u32]) {

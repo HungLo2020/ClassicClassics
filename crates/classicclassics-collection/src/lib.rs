@@ -1,4 +1,5 @@
 //! Collection orchestration shared by the native and headless hosts.
+pub mod assets;
 pub mod audio;
 pub mod cli;
 mod config_file;

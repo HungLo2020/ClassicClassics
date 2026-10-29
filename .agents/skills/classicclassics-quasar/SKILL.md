@@ -11,6 +11,8 @@ Use this skill when modifying the Classic Classics repository.
 
 - Keep simulations and draw lists in the library. Do not put window, GPU,
   gamepad or audio-device calls in game modules.
+- Use `classicclassics-assets` / `quasar-assets` for read-only asset sources, typed
+  decoding and caching. Games receive mounts; avoid global caches or path discovery.
 - Use Quasar crates for infrastructure: `quasar-core` timing,
   `quasar-window`, `quasar-input`, `quasar-render-2d`, `quasar-audio`,
   `quasar-storage`, `quasar-config`.
@@ -32,7 +34,9 @@ Use this skill when modifying the Classic Classics repository.
    the host applies `Session::controls` with `sync_controls`. Never bind physical
    keys in a game crate.
 3. Emit shared `Sound` events. Synthesis and native playback live in
-   `crates/classicclassics-collection/src/audio.rs`; never load audio files.
+   `crates/classicclassics-collection/src/audio.rs`. Imported audio is prepared
+   through shared asset handles at game boundaries; never load/decode during ticks
+   or audio callbacks. See `docs/assets.md`.
 4. Verify the draw list is deterministic and validates with
    `Canvas::validate`.
 5. Keep game record schemas and update rules in each game crate. The collection

@@ -34,10 +34,11 @@ pub struct Cinematic {
     sound_commands: Vec<[u32; 2]>,
 }
 impl Cinematic {
-    fn load(directory: &Path) -> Result<Self, String> {
+    fn load(directory: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let directory = directory.open_assets()?;
         let path = directory.join("timeline.json");
         let timeline: Timeline = serde_json::from_slice(
-            &std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?,
+            &path.read().map_err(|e| format!("{}: {e}", path.display()))?,
         )
         .map_err(|e| format!("{}: {e}", path.display()))?;
         if timeline.tile_size != 8 || timeline.atlas_columns == 0 || timeline.frames.is_empty() {
@@ -52,10 +53,10 @@ impl Cinematic {
                 path.display()
             ));
         }
-        let image = image::open(directory.join(&timeline.atlas))
+        let image = directory.join(&timeline.atlas).image()
             .map_err(|e| e.to_string())?
-            .into_rgba8();
-        let (width, height) = image.dimensions();
+            ;
+        let (width, height) = (image.width(), image.height());
         if width as usize != timeline.atlas_columns * 8 || height == 0 || height % 8 != 0 {
             return Err(format!(
                 "{}: atlas dimensions do not match tile layout",
@@ -107,7 +108,7 @@ impl Cinematic {
         }
         Ok(Self {
             sound_commands: timeline.sound_commands,
-            atlas: Texture::from_rgba(width as usize, height as usize, image.into_raw())?,
+            atlas: Texture::from_rgba(width as usize, height as usize, image.rgba().to_vec())?,
             columns: timeline.atlas_columns,
             compositions,
             duration: elapsed,
@@ -151,7 +152,8 @@ pub struct Cinematics {
 }
 impl Cinematics {
     /// `root` is the asset directory containing `cinematics/manifest.json`.
-    pub fn load(root: &Path) -> Result<Self, String> {
+    pub fn load(root: &(impl classicclassics_assets::AssetLocation + ?Sized)) -> Result<Self, String> {
+        let root = root.open_assets()?;
         #[derive(Deserialize)]
         struct AudioManifest {
             sounds: Vec<AudioCommand>,
@@ -161,7 +163,7 @@ impl Cinematics {
             command: u8,
         }
         let audio: AudioManifest = serde_json::from_slice(
-            &std::fs::read(root.join("audio.json")).map_err(|e| e.to_string())?,
+            &root.join("audio.json").read().map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
         let available_commands: std::collections::BTreeSet<u8> = audio
@@ -172,7 +174,7 @@ impl Cinematics {
             .collect();
         let directory = root.join("cinematics");
         let names: Vec<String> = serde_json::from_slice(
-            &std::fs::read(directory.join("manifest.json")).map_err(|e| e.to_string())?,
+            &directory.join("manifest.json").read().map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
         let mut clips = BTreeMap::new();
