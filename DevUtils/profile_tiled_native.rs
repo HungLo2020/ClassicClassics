@@ -2,8 +2,6 @@
 //! setup/cinematics. Uses exactly the application's host and Quasar presenter.
 #[path = "../src/desktop.rs"]
 mod desktop;
-#[path = "../src/native_renderer.rs"]
-mod native_renderer;
 use classicclassics_collection::{
     Game, GameKind, Records, Screen, Session, cli::Options, settings::Settings,
 };

@@ -70,7 +70,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```
 
-The full build adds `quasar-window`, VulkanicGAL, `quasar-audio`'s CPAL backend
+The full build adds `quasar-app`, `quasar-window`, wgpu 30, `quasar-audio`'s CPAL backend
 and the `gilrs` gamepad adapter. Unit tests still do not require a GPU; the
 windowed smoke test does.
 
@@ -183,6 +183,6 @@ Repeat for the other imports.
 software-vs-Quasar pixels, cameras, tile edits, animation, cinematic samples and
 production resource cleanup. Jackal's `quasar_scene_priority` unit test covers all
 64 OAM rotations. Native GPU masking and resize/recovery must also be exercised;
-see [Quasar tilemaps](quasar-tilemaps.md) for the presentation adapter and v0.2.18 native performance results.
+see [Quasar tilemaps](quasar-tilemaps.md) for the presentation adapter and current wgpu verification notes.
 Use `cargo run --locked --example profile_tiled_native -- micromages` (or
 `jackal`) to measure steady-state gameplay without setup/cinematics.

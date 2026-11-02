@@ -3,8 +3,6 @@
 
 #[cfg(feature = "desktop")]
 mod desktop;
-#[cfg(feature = "desktop")]
-mod native_renderer;
 
 use classicclassics_collection::cli::{self, Options};
 use classicclassics_collection::controls::Controls;
@@ -82,7 +80,14 @@ fn run() -> classicclassics_collection::Result {
     };
     let mut session = Session::new(records, settings);
     session.controls = controls;
-    if let Some(kind) = options.game {
+    let defer_desktop_launch = !options.headless
+        && options.ticks.is_none()
+        && options.screenshot.is_none()
+        && options.state.is_none()
+        && options.smoke_frames.is_none()
+        && !options.settings
+        && !options.controls;
+    if !defer_desktop_launch && let Some(kind) = options.game {
         session.launch(kind);
     }
     if options.settings {

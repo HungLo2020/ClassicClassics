@@ -76,9 +76,9 @@ uses the host's matching configuration and plugins, including its
 PipeWire/PulseAudio integration. No private ALSA, udev, GCC, Vulkan or windowing
 library is shipped, and the executable has no RPATH/RUNPATH override.
 Packaging checks direct library dependencies and rejects a private search path;
-ZIP verification rejects shared libraries. VulkanicGAL is the only graphics
-backend; the shader compiler is linked into the executable at build time, so no
-runtime GLSL compiler is needed. CI builds on Ubuntu 22.04 for a glibc **2.35
+ZIP verification rejects shared libraries. Quasar’s wgpu renderer is the only graphics
+backend; it uses checked-in WGSL and needs no runtime GLSL compiler. CI builds on
+Ubuntu 22.04 for a glibc **2.35
 minimum**; a release built locally on a newer distribution may require a newer
 glibc.
 

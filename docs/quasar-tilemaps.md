@@ -1,10 +1,11 @@
 # Quasar tilemaps and indexed rendering
 
-Classic Classics pins all Quasar dependencies to **v0.2.18**, commit
-`5cc7517daa1dee8d18cc0cc8474099fc8cd12075`. The migration uses the release's
-preloaded tilesets, incremental tile edits, indexed images/palette bindings and
-per-pixel priority APIs. Original asset files, simulations, collision rules,
-video frequencies, save records and global controls stay compatible.
+Classic Classics pins all Quasar dependencies to **v0.2.20**, commit
+`17fdff06aeb8e28fb0419dd06af2ce2a698c13f3`. The pinned release uses native wgpu
+for presentation and retains the preloaded tilesets, incremental tile edits,
+indexed images/palette bindings and per-pixel priority APIs. Original asset
+files, simulations, collision rules, video frequencies, save records and global
+controls stay compatible.
 
 ## Game rendering
 
@@ -59,22 +60,19 @@ catalog removes imported texture identities; switching games or restarting
 prunes replaced resources. Entering a tiled scene destroys the obsolete native
 software-frame dynamic texture. Quasar performs normal GPU upload and retirement.
 
-## Native masked presentation in v0.2.17–v0.2.18
+## Native masked presentation
 
-Quasar's `Renderer2D::present` convenience path cannot currently attach its
-private stencil to a semantic swapchain `FrameTarget`: `mask_target` obtains a
-frame handle where `RenderTargetDesc::color_views` requires a texture view.
-Native reproduction reports `WrongHandleType: expected TextureView, got FrameTarget`.
-Headless owned-target rendering does not have this limitation.
+Quasar v0.2.20 uses native wgpu render passes and supports masked canvases
+directly through `quasar_render_2d::Renderer2D`. The application no longer owns
+a custom `RenderState2D`/`FrameSurface` composition: `Renderer2D::for_window`
+acquires the surface, `present` applies palette and pixel-priority masks in the
+native pass, and `render_to_image` provides GPU readback for screenshots. The
+previous v0.2.17–v0.2.18 workaround was removed with `src/native_renderer.rs`.
 
-`src/native_renderer.rs` therefore composes Quasar's public `RenderState2D`,
-`FrameSurface` and GAL APIs. Ordinary canvases draw directly to the acquired
-frame. Masked canvases draw into one reusable owned color target, then use
-`CopyTextureToFrameTarget` on the GPU. This adds no CPU framebuffer/readback,
-shader implementation or custom tile renderer. Resizing retires the old target;
-Quasar owns the mask attachments, frame transactions and submission tracking.
-GPU screenshots use Quasar's `OffscreenTarget`. This application-owned glue can
-be simplified when Quasar's convenience window presenter supports masked targets.
+The headless reference renderer still implements the same mask rules in software,
+so draw-list tests do not require a GPU. `WGPU_BACKEND` selects the native
+backend; Linux uses Vulkan 1.3 with dynamic rendering, synchronization2 and
+timeline semaphores.
 
 ## Validation
 
@@ -88,12 +86,15 @@ stable texture identities on repeated draws and cleanup on catalog return.
 The original game regression suites, no-I/O asset/restart checks, headless host,
 native gameplay/settings/window smoke tests and relocated Basalt package checks
 continue to exercise the shared pipeline. Native `--smoke-frames` reports CPU
-scene preparation, presentation and upload counters; keep performance measurement
-separate from concurrent compile/test workloads.
+scene preparation, presentation and upload counters; the desktop host now uses
+`quasar-app` for window, event and fixed-step scheduling. Keep performance
+measurement separate from concurrent compile/test workloads.
 
-Native profiling found that v0.2.17 split every mask-writing tile into a
-separate draw batch. The fix is included in the pinned v0.2.18 release. Isolated
-1280×720 native gameplay runs on the local RTX 2070 measured:
+The following measurements were recorded on the older VulkanicGAL v0.2.18
+renderer and are retained as historical context. Native profiling found that
+v0.2.17 split every mask-writing tile into a separate draw batch; that fix
+remained in v0.2.18. Isolated 1280×720 native gameplay runs on the local RTX 2070
+measured:
 
 | Game | Batches | Scene p95 | Presentation p95 | Intervals over 25 ms |
 |---|---:|---:|---:|---:|
@@ -102,8 +103,8 @@ separate draw batch. The fix is included in the pinned v0.2.18 release. Isolated
 
 Both used zero recurring texture uploads and zero dynamic framebuffer textures.
 These are local debug-build measurements, not a guarantee on other hardware.
-All 26 renderer library tests from the published v0.2.18 source passed with
-native GPU conformance enabled, including both mask-batching regression tests.
-The separate native frame-target workaround above remains necessary.
+The v0.2.20 migration removes the old native frame-target workaround; mask and
+palette rendering is verified through the current wgpu presenter and the shared
+reference-pixel suites.
 See [the investigation](quasar-v0.2.17-rendering-issues.md) for the original
 170–218 ms presentation measurements and diagnosis.

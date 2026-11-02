@@ -4,7 +4,7 @@ Classic Classics is a Cargo workspace with eleven crates, including one executab
 
 | Package | Location | Responsibility |
 |---|---|---|
-| `classicclassics` | `src/` | Native window/event loop and headless command-line host |
+| `classicclassics` | `src/` | Quasar-app desktop host and headless command-line host |
 | `classicclassics-assets` | `crates/classicclassics-assets/` | Quasar mounts, typed loading, asset handles and cache |
 | `classicclassics-core` | `crates/classicclassics-core/` | `ArcadeGame`, `GameInfo`, input, sound events, HUD hints, vector drawing, RNG and particles |
 | `classicclassics-collection` | `crates/classicclassics-collection/` | Registration, session, catalog, settings overlay, bindings, persistence and audio synthesis |
@@ -21,6 +21,8 @@ on core, Serde and Quasar's draw-list API; file-backed games also use the
 shared asset crate. Games never depend on each other,
 windowing, storage or device backends. Core is independent of all game crates.
 The host's `desktop`, `gamepad` and `audio` features enable platform backends;
+`quasar-app` owns the window, native events and fixed-step callback order, while
+the host still owns the collection session, renderer, audio and persistence;
 the collection's `audio` feature only adds native audio output.
 
 `ArcadeGame` defines fixed-step update, draw list, autoplay, record update,
@@ -192,7 +194,7 @@ from a corrupt one; corrupt files are preserved rather than overwritten.
 `write_json` is atomic (temporary file, `sync_all`, rename). Preferences are
 parsed by Quasar Config. Its `Config` handles defaults/file/CLI precedence and
 validates typed values through Serde. TOML configuration is written by a small
-`config_file` adapter with the same atomic contract, since Quasar 0.2.18 exposes
+`config_file` adapter with the same atomic contract, since Quasar 0.2.20 exposes
 no TOML writer. Legacy JSON is read only when the TOML file is absent; valid
 preferences migrate on normal exit without deleting JSON. Corrupt/newer files
 prevent replacement, and saves retain their version-one JSON schema. The files are:

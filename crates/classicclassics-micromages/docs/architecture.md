@@ -29,7 +29,7 @@ It does not drive the current game.
    `0x00RRGGBB` framebuffer. Rendering never advances gameplay. Settings draw over
    the frozen frame.
 7. `quasar-render-2d::FramebufferPresenter` uploads that framebuffer and presents it
-   through VulkanicGAL. `quasar-core::Viewport` fits the 16:15 image to the window
+   through Quasar’s wgpu renderer. `quasar-core::Viewport` fits the 16:15 image to the window
    or screen, so bars appear only left/right or top/bottom, and nearest or linear
    sampling follows the Sharp/Smooth setting. Resizing, fullscreen transitions and
    DPI changes only change the presentation target.

@@ -29,6 +29,8 @@ pub struct Session {
     pub records: Records,
     pub settings: Settings,
     pub sounds: Vec<Sound>,
+    /// A desktop launch waiting for its first visible loading frame.
+    pub loading: Option<GameKind>,
 }
 
 impl Session {
@@ -44,6 +46,7 @@ impl Session {
             records,
             settings,
             sounds: Vec::new(),
+            loading: None,
         }
     }
 
@@ -76,6 +79,7 @@ impl Session {
     }
 
     pub fn launch(&mut self, kind: GameKind) {
+        self.loading = None;
         self.selected = GameKind::ALL
             .iter()
             .position(|candidate| *candidate == kind)
@@ -105,6 +109,9 @@ impl Session {
     /// Advances one fixed tick. Returns true when the application should quit.
     pub fn tick(&mut self, input: Input) -> bool {
         self.sounds.clear();
+        if self.loading.is_some() {
+            return false;
+        }
         if let Some(screen) = &mut self.controls_screen {
             if screen.tick(input, &mut self.controls) {
                 self.controls_screen = None;
@@ -246,7 +253,11 @@ impl Session {
                 }
             }
         };
-        Ok(self.overlay(base))
+        let base = self.overlay(base);
+        Ok(match self.loading {
+            Some(kind) => loading_scene(base, kind),
+            None => base,
+        })
     }
 
     fn overlay(&mut self, base: Canvas) -> Canvas {
@@ -293,7 +304,7 @@ impl Session {
     }
 
     pub fn autoplay(&self) -> Input {
-        if self.settings_screen.is_some() {
+        if self.loading.is_some() || self.settings_screen.is_some() {
             return Input::default();
         }
         match &self.screen {
@@ -358,6 +369,28 @@ impl Session {
         })
         .expect("session state is serializable")
     }
+}
+
+fn loading_scene(base: Canvas, kind: GameKind) -> Canvas {
+    let width = base.width() as f32;
+    let height = base.height() as f32;
+    let mut paint = crate::paint::Paint::over(base);
+    paint.rect(0., 0., width, height, [0, 0, 0, 220]);
+    paint.text(
+        width * 0.5 - 150.,
+        height * 0.5 - 40.,
+        "LOADING",
+        4.0,
+        [230, 233, 245, 255],
+    );
+    paint.text(
+        width * 0.5 - 100.,
+        height * 0.5 + 20.,
+        kind.name(),
+        3.0,
+        [125, 245, 57, 255],
+    );
+    paint.into_canvas()
 }
 
 #[cfg(test)]

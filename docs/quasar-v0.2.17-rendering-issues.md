@@ -1,3 +1,6 @@
+> Historical investigation. The project now pins Quasar **v0.2.20** and uses
+> its native wgpu `Renderer2D`; `src/native_renderer.rs` has been removed.
+
 # Quasar v0.2.17 native rendering findings
 
 Audited tag: `v0.2.17`, commit `59cf3c34ddb0a59ea91c330b8c93920a86da7c93`.

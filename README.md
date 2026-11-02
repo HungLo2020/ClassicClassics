@@ -151,18 +151,20 @@ cargo run --no-default-features -- --check-bindings /tmp/controls.toml
 
 ## Build and run
 
-Requirements are a current stable Rust toolchain (1.94), CMake, Ninja or Make,
-a C++ compiler, and the usual Linux window/audio/Vulkan development packages:
+Requirements are a current stable Rust toolchain (1.94) and the usual Linux
+window/audio/Vulkan development packages:
 
 ```sh
-sudo apt install build-essential cmake ninja-build pkg-config \
+sudo apt install build-essential pkg-config \
   libxkbcommon-dev libxkbcommon-x11-0 libasound2-dev libudev-dev \
   libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev libvulkan-dev
 cargo run
 ```
 
-The native game needs a Vulkan 1.3 driver. Quasar's headless reference
-renderer and every simulation run without a GPU or window:
+The native game uses Quasar's wgpu 30 renderer through Vulkan 1.3, including
+dynamic rendering, synchronization2 and timeline semaphores. `WGPU_BACKEND`
+selects a backend. Quasar's headless reference renderer and every simulation run
+without a GPU or window:
 
 ```sh
 cargo run --no-default-features -- --headless --ticks 2 \
@@ -213,11 +215,12 @@ Nothing in the game loop is hand-rolled infrastructure:
 | Quasar crate | Used for |
 |---|---|
 | `quasar-assets` | Read-only game/embedded mounts, typed loaders, handles and bounded caching |
+| `quasar-app` | Window lifecycle, native event routing, frame snapshot and fixed-step scheduling |
 | `quasar-core` | Fixed 120 Hz step and shared viewport/scaling types |
-| `quasar-window` | Native window, desktop identity, keyboard/mouse state, winit events |
+| `quasar-window` | Native window, desktop identity and raw keyboard/mouse/gamepad state |
 | `quasar-input` | Named actions, bindings, edge detection, deadzones, controller hotplug |
 | `quasar-ui` | Shared controls editor widgets, layout, focus and isolated rebinding |
-| `quasar-render-2d` | Ordered draw lists, indexed palettes, pixel-priority masks, GPU presentation and headless rasterisation |
+| `quasar-render-2d` | Ordered draw lists, indexed palettes, pixel-priority masks, wgpu presentation and headless rasterisation |
 | `quasar-tilemap` | Micro Mages/Jackal terrain, preloaded atlases, camera culling and incremental destruction edits |
 | `quasar-audio` | Generated effects, original Ogg/WAV clips, music buses and optional CPAL output |
 | `quasar-storage` | Basalt directory discovery and atomic JSON persistence |
@@ -248,7 +251,7 @@ Records and JSON exports are written through `quasar_storage::write_json`, which
 temporary file in the same directory, syncs it and renames it into place.
 Existing corrupt or newer files are preserved and defaults are used; nothing is
 ever written into `app/`. TOML preferences use the same atomic temporary-file,
-sync and rename pattern in the collection crate, because Quasar 0.2.18 only
+sync and rename pattern in the collection crate, because Quasar 0.2.20 only
 provides a JSON writer.
 
 ## Release and catalog
