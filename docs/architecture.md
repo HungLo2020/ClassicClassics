@@ -1,6 +1,6 @@
 # Architecture
 
-Classic Classics is a Cargo workspace with eleven crates, including one executable.
+Classic Classics is a Cargo workspace with twelve crates, including one executable.
 
 | Package | Location | Responsibility |
 |---|---|---|
@@ -15,6 +15,7 @@ Classic Classics is a Cargo workspace with eleven crates, including one executab
 | `classicclassics-jackal` | `crates/classicclassics-jackal/` | Original Jackal campaign, renderer and adapter |
 | `classicclassics-missile-command` | `crates/classicclassics-missile-command/` | Original Missile Command simulation, renderer and adapter |
 | `classicclassics-river-raid` | `crates/classicclassics-river-raid/` | Original River Raid simulation, renderer and adapter |
+| `classicclassics-fruitslicer` | `crates/classicclassics-fruitslicer/` | Original Fruit Slicer simulation, 1280×720 renderer, retained menus and adapter |
 
 The dependency direction is host → collection → games → core. Each game depends
 on core, Serde and Quasar's draw-list API; file-backed games also use the

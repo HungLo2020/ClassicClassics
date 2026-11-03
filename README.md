@@ -2,9 +2,9 @@
 
 A single-window arcade collection built almost entirely from
 [Quasar](https://github.com/HungLo2020/Quasar) infrastructure: Pong, Lunar
-Lander, Asteroids, Micro Mages, Jackal, Missile Command and River Raid, with
-vector and original pixel rendering, shared controls, persistent high scores
-and a Basalt-ready Linux release.
+Lander, Asteroids, Micro Mages, Jackal, Missile Command, River Raid and Fruit
+Slicer, with vector, original pixel and native-resolution sprite rendering,
+shared controls, persistent high scores and a Basalt-ready Linux release.
 
 ![Classic Classics cover](app/basalt/cover.png)
 
@@ -23,10 +23,12 @@ and the [Basalt Game Standard](https://github.com/HungLo2020/Basalt/blob/main/ST
 | **Jackal** | Overhead action | Rescue prisoners and fight through six stages; 1–2 local players. |
 | **Missile Command** | Arcade defense | Aim and fire three batteries to protect six cities. |
 | **River Raid** | Scrolling shooter | Navigate the river, destroy targets and manage fuel. |
+| **Fruit Slicer** | Slicing arcade | Swipe fruit, chain combos and avoid bombs across Classic, Arcade and Zen runs. |
 
 The catalog screen is the entry point. It uses a 1920×1080 logical canvas with
 a three-column, two-row grid (six cards per page), and pages automatically as
-games are added. The first page holds six games; River Raid is on page two.
+games are added. The first page holds six games; River Raid and Fruit Slicer
+are on page two.
 
 The game starts in borderless fullscreen on the detected monitor, with a
 1920×1080 fallback. Saved preferences and explicit `--windowed` or
@@ -200,6 +202,7 @@ Shared library code lives under `crates/`:
 | `classicclassics-jackal` | Imported Jackal campaign, sprites and collection adapter |
 | `classicclassics-missile-command` | Imported Missile Command simulation, pixels and collection adapter |
 | `classicclassics-river-raid` | Imported River Raid simulation, pixels and collection adapter |
+| `classicclassics-fruitslicer` | Imported Fruit Slicer simulation, native-resolution renderer, menus and adapter |
 
 Every game depends on the core API and Quasar's headless draw lists. File-backed
 games also use the shared asset API; the collection supplies their mounts. Games
@@ -222,6 +225,8 @@ Nothing in the game loop is hand-rolled infrastructure:
 | `quasar-ui` | Shared controls editor widgets, layout, focus and isolated rebinding |
 | `quasar-render-2d` | Ordered draw lists, indexed palettes, pixel-priority masks, wgpu presentation and headless rasterisation |
 | `quasar-tilemap` | Micro Mages/Jackal terrain, preloaded atlases, camera culling and incremental destruction edits |
+| `quasar-animation` | Fruit Slicer's logo breathing animation |
+| `quasar-sim` | Fruit Slicer's deterministic state hashing and replay fixtures |
 | `quasar-audio` | Generated effects, original Ogg/WAV clips, music buses and optional CPAL output |
 | `quasar-storage` | Basalt directory discovery and atomic JSON persistence |
 | `quasar-config` | Common CLI/environment parsing (`--headless`, `--resolution`, `--no-audio`, …) |

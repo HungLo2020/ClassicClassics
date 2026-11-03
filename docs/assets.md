@@ -8,9 +8,9 @@ Game crates retain their level schemas, palette interpretation and validation.
 ## Ownership and loading
 
 Each `Session` owns `GameAssets`, which owns one Quasar `AssetServer`. Selecting a
-file-backed game mounts its directory as `micromages/` or `jackal/`. The game's
-fallible `ArcadeGame::load` receives that virtual directory and prepares its
-immutable content. Gameplay and restart reuse an `Arc` to that content; restart
+file-backed game mounts its directory as `micromages/`, `jackal/` or
+`fruitslicer/`. The game's fallible `ArcadeGame::load` receives that virtual
+directory and prepares its immutable content. Gameplay and restart reuse an `Arc` to that content; restart
 does not rediscover paths, read files or decode images. Dropping the game releases
 its content. There are no process-global game asset caches.
 

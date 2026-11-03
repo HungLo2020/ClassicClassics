@@ -57,11 +57,20 @@ macro_rules! games {
             pub fn paused(&self) -> bool {
                 match self { $(Self::$variant(game) => game.paused(),)+ }
             }
+            pub fn quit_requested(&self) -> bool {
+                match self { $(Self::$variant(game) => game.quit_requested(),)+ }
+            }
+            pub fn canvas_size(&self) -> (u32, u32) {
+                match self { $(Self::$variant(game) => game.canvas_size(),)+ }
+            }
             pub fn autoplay(&self) -> Input {
                 match self { $(Self::$variant(game) => game.autoplay(),)+ }
             }
             pub fn draw_frame(&self, hints: &ControlHints) -> Option<classicclassics_core::tiled::DrawFrame> {
                 match self { $(Self::$variant(game) => game.draw_frame(hints),)+ }
+            }
+            pub fn canvas_frame(&self, hints: &ControlHints) -> Option<classicclassics_core::tiled::DrawFrame> {
+                match self { $(Self::$variant(game) => game.canvas_frame(hints),)+ }
             }
             pub fn pixel_frame(&self, hints: &ControlHints) -> Option<classicclassics_core::imported::PixelFrame> {
                 match self { $(Self::$variant(game) => game.pixel_frame(hints),)+ }
@@ -93,6 +102,7 @@ macro_rules! games {
 }
 
 use classicclassics_asteroids as asteroids;
+use classicclassics_fruitslicer as fruitslicer;
 use classicclassics_lunar as lunar;
 use classicclassics_pong as pong;
 
@@ -109,6 +119,7 @@ games! {
     Jackal => jackal, jackal, "05";
     MissileCommand => missile, missile, "06";
     RiverRaid => river, river, "07";
+    FruitSlicer => fruitslicer, fruitslicer, "08";
 }
 
 #[cfg(test)]

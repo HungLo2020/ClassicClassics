@@ -165,6 +165,74 @@ fn river_raid_keeps_original_steering_speed_fuel_and_firing_rules() {
 }
 
 #[test]
+fn fruit_slicer_retains_menus_native_canvas_slicing_and_records() {
+    use classicclassics_collection::games::{Game, GameKind};
+    use classicclassics_core::Sound;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../classicclassics-fruitslicer/assets");
+    let assets = classicclassics_assets::Assets::default();
+    let root = assets.mount_file("fruitslicer", &path).unwrap();
+    let mut game = Game::load(GameKind::FruitSlicer, Some(&root)).unwrap();
+    let mut sounds = Vec::new();
+    game.tick(Input::default(), &mut sounds);
+    let menu = game.canvas_frame(&Default::default()).unwrap();
+    assert_eq!((menu.canvas.width(), menu.canvas.height()), (1280, 720));
+    assert!(!menu.images.is_empty(), "FruitSlicer art did not load");
+    assert!(menu.canvas.quads().len() > 40, "mode menu did not draw");
+
+    for _ in 0..8 {
+        game.tick(game.autoplay(), &mut sounds);
+    }
+    assert!(game.summary().contains("menu=None"));
+    assert!(sounds.iter().any(|sound| matches!(
+        sound,
+        Sound::Asset(classicclassics_core::audio::AssetSound::Music {
+            game: "fruitslicer",
+            ..
+        })
+    )));
+
+    for _ in 0..1200 {
+        game.tick(game.autoplay(), &mut sounds);
+    }
+    let snapshot = state(&game);
+    assert!(
+        snapshot["state"]["engine"]["score"].as_i64().unwrap() > 0,
+        "autoplay did not slice fruit"
+    );
+    let game_canvas = game.canvas_frame(&Default::default()).unwrap();
+    assert_eq!(
+        (game_canvas.canvas.width(), game_canvas.canvas.height()),
+        (1280, 720)
+    );
+
+    game.tick(
+        Input {
+            pause: true,
+            ..Default::default()
+        },
+        &mut sounds,
+    );
+    assert!(game.paused());
+    assert!(game.summary().contains("menu=Some(Pause)"));
+    game.tick(
+        Input {
+            confirm: true,
+            ..Default::default()
+        },
+        &mut sounds,
+    );
+    assert!(!game.paused());
+    assert!(game.summary().contains("menu=None"));
+
+    let mut record = classicclassics_collection::Records::default();
+    record.fruitslicer.classic.best = 77;
+    game.record(&mut record);
+    assert!(record.fruitslicer.classic.best >= 77);
+}
+
+#[test]
 fn every_import_pauses_resumes_and_restarts_through_the_shared_actions() {
     use classicclassics_collection::games::{Game, GameKind};
     for kind in [

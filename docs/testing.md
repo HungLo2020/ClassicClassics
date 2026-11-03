@@ -7,7 +7,7 @@ cargo test --locked --no-default-features
 ```
 
 This build excludes the window, GPU, gamepad and native audio backends. It runs
-the menu, all seven simulations, vector/pixel draw-list validation, reference
+the menu, all eight simulations, vector/pixel draw-list validation, reference
 rasterisation, controls validation, CLI parsing and generated-audio tests. The
 suite covers:
 
@@ -54,10 +54,12 @@ cargo run --locked --no-default-features -- \
   --headless --game asteroids --settings --ticks 1 --screenshot /tmp/settings.png
 ```
 
-Additional game aliases are `micromages`, `jackal`, `missile-command` and
-`river-raid`. Use 6000 ticks to exercise setup and actual gameplay during autoplay.
+Additional game aliases are `micromages`, `jackal`, `missile-command`,
+`river-raid` and `fruitslicer`. Use 6000 ticks to exercise setup and actual
+gameplay during autoplay.
 
-The catalog screenshot is 1920×1080; game screenshots remain 960×600.
+The catalog screenshot is 1920×1080. Most game screenshots remain 960×600;
+Fruit Slicer presents its native 1280×720 canvas without letterboxing.
 
 `--state` writes a JSON snapshot with the selected menu entry, records and the
 current game state. `--ticks` counts fixed simulation ticks, not frames.

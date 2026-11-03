@@ -35,6 +35,19 @@ impl DrawFrame {
         paint.text(16., HEIGHT as f32 - 25., &self.help, 1.4, WHITE);
         paint.into_canvas()
     }
+
+    /// Native-resolution canvas with only the texture identifiers remapped.
+    pub fn native_canvas(&self, mut resolve: impl FnMut(TextureId) -> TextureId) -> Canvas {
+        let mut canvas =
+            Canvas::new(self.canvas.width(), self.canvas.height()).expect("valid frame canvas");
+        canvas.clear = self.canvas.clear;
+        self.append(&mut canvas, [0., 0.], [1., 1.], &mut resolve);
+        canvas.set_transform(Transform2D::IDENTITY);
+        canvas.set_clip(None);
+        canvas.set_palette(None);
+        canvas.set_pixel_state(Default::default());
+        canvas
+    }
     fn append(
         &self,
         canvas: &mut Canvas,

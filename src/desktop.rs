@@ -549,6 +549,16 @@ impl SceneTarget for GpuSceneTarget<'_> {
         }
         self.assets.import_frame(frame)
     }
+    fn import_native_frame(
+        &mut self,
+        frame: &classicclassics_collection::rendering::DrawFrame,
+    ) -> classicclassics_collection::Result<quasar_render_2d::Canvas> {
+        if let Some((texture, _)) = self.pixel.take() {
+            self.renderer
+                .destroy_dynamic_texture(&mut self.assets.textures, texture)?;
+        }
+        self.assets.import_native(frame)
+    }
     fn artwork(&self) -> &CatalogArt {
         &self.assets.artwork
     }

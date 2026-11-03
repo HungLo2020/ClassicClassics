@@ -375,6 +375,7 @@ dependencies = [
  "classicclassics-assets",
  "classicclassics-asteroids",
  "classicclassics-core",
+ "classicclassics-fruitslicer",
  "classicclassics-jackal",
  "classicclassics-lunar",
  "classicclassics-micromages",
@@ -402,6 +403,25 @@ dependencies = [
  "quasar-render-2d",
  "quasar-tilemap",
  "serde",
+]
+
+[[package]]
+name = "classicclassics-fruitslicer"
+version = "1.0.0"
+dependencies = [
+ "classicclassics-assets",
+ "classicclassics-core",
+ "quasar-animation",
+ "quasar-assets",
+ "quasar-config",
+ "quasar-render-2d",
+ "quasar-sim",
+ "quasar-storage",
+ "quasar-ui",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -900,7 +920,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 2.0.21",
- "windows 0.54.0",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -1940,6 +1960,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
+name = "quasar-animation"
+version = "0.2.20"
+source = "git+https://github.com/HungLo2020/Quasar?tag=v0.2.20#17fdff06aeb8e28fb0419dd06af2ce2a698c13f3"
+
+[[package]]
 name = "quasar-app"
 version = "0.2.20"
 source = "git+https://github.com/HungLo2020/Quasar?tag=v0.2.20#17fdff06aeb8e28fb0419dd06af2ce2a698c13f3"
@@ -1953,6 +1978,9 @@ dependencies = [
 name = "quasar-assets"
 version = "0.2.20"
 source = "git+https://github.com/HungLo2020/Quasar?tag=v0.2.20#17fdff06aeb8e28fb0419dd06af2ce2a698c13f3"
+dependencies = [
+ "quasar-storage",
+]
 
 [[package]]
 name = "quasar-audio"
@@ -2003,10 +2031,20 @@ version = "0.2.20"
 source = "git+https://github.com/HungLo2020/Quasar?tag=v0.2.20#17fdff06aeb8e28fb0419dd06af2ce2a698c13f3"
 dependencies = [
  "png 0.17.16",
+ "quasar-assets",
  "quasar-core",
  "quasar-frame",
  "raw-window-handle",
  "vulkanic-gal",
+]
+
+[[package]]
+name = "quasar-sim"
+version = "0.2.20"
+source = "git+https://github.com/HungLo2020/Quasar?tag=v0.2.20#17fdff06aeb8e28fb0419dd06af2ce2a698c13f3"
+dependencies = [
+ "quasar-core",
+ "serde",
 ]
 
 [[package]]

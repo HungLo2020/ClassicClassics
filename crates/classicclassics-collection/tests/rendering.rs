@@ -12,6 +12,14 @@ const IMPORTS: [GameKind; 4] = [
     GameKind::RiverRaid,
 ];
 
+const COVERED: [GameKind; 5] = [
+    GameKind::MicroMages,
+    GameKind::Jackal,
+    GameKind::MissileCommand,
+    GameKind::RiverRaid,
+    GameKind::FruitSlicer,
+];
+
 #[test]
 fn imports_cache_video_frames_and_render_one_textured_quad_without_changing_snapshots() {
     let mut assets = SceneAssets::new().unwrap();
@@ -91,7 +99,7 @@ fn textured_frame_preserves_pixel_colors_and_four_by_three_geometry() {
 fn both_catalog_pages_use_the_complete_basalt_covers_at_portrait_aspect() {
     let mut assets = SceneAssets::new().unwrap();
     let mut session = Session::new(Records::default(), Settings::default());
-    for kind in IMPORTS {
+    for kind in COVERED {
         let texture = assets
             .artwork
             .get(kind)
@@ -121,7 +129,7 @@ fn artwork_pixels_match_the_independent_basalt_source_manifest() {
     let manifest: serde_json::Value =
         serde_json::from_str(include_str!("../../../docs/artwork-sources.json")).unwrap();
     let assets = SceneAssets::new().unwrap();
-    for kind in IMPORTS {
+    for kind in COVERED {
         let entry = &manifest[kind.info().aliases[0]];
         let image = assets
             .textures

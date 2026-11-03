@@ -26,5 +26,12 @@
     "rgba_fnv1a64": "10d8425630fe301d",
     "width": 900,
     "height": 1200
+  },
+  "fruitslicer": {
+    "source": "https://github.com/HungLo2020/FruitSlicer/blob/2a69fa7f574133fdba9e31da6472ea9ee5283bba/app/basalt/cover.png",
+    "source_sha256": "9e109bffa0e326a29c92e2e5944b7065e08c9bc9216bb01cc7a95a05078d65c6",
+    "rgba_fnv1a64": "b21db849e54b62fc",
+    "width": 900,
+    "height": 1200
   }
 }

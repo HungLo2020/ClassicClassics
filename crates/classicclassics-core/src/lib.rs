@@ -43,11 +43,26 @@ pub trait ArcadeGame: Default + Clone + std::fmt::Debug + Serialize + Deserializ
     fn draw_frame(&self, _hints: &ControlHints) -> Option<tiled::DrawFrame> {
         None
     }
+    /// A native-resolution canvas with its own images, presented without the
+    /// 4:3 letterboxing that `draw_frame` applies to tile scenes.
+    fn canvas_frame(&self, _hints: &ControlHints) -> Option<tiled::DrawFrame> {
+        None
+    }
     fn pixel_frame(&self, _hints: &ControlHints) -> Option<imported::PixelFrame> {
         None
     }
 
+    /// Logical canvas used for pointer mapping and presentation.
+    fn canvas_size(&self) -> (u32, u32) {
+        (WIDTH, HEIGHT)
+    }
+
     fn paused(&self) -> bool {
+        false
+    }
+
+    /// True when the game's own menu asked the host to exit.
+    fn quit_requested(&self) -> bool {
         false
     }
     fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>);

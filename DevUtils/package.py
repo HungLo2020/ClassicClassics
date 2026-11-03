@@ -38,7 +38,7 @@ def version() -> str:
 
 def game_assets():
     """Source assets mapped into the release-owned app tree."""
-    for game in ("micromages", "jackal"):
+    for game in ("micromages", "jackal", "fruitslicer"):
         root = ROOT / "crates" / f"classicclassics-{game}" / "assets"
         for path in sorted(root.rglob("*")):
             if path.is_file():

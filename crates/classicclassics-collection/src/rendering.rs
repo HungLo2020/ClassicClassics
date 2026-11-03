@@ -20,6 +20,13 @@ pub trait SceneTarget {
         &mut self,
         frame: &classicclassics_core::tiled::DrawFrame,
     ) -> Result<quasar_render_2d::Canvas>;
+    /// Import a native-resolution frame without letterboxing.
+    fn import_native_frame(
+        &mut self,
+        frame: &classicclassics_core::tiled::DrawFrame,
+    ) -> Result<quasar_render_2d::Canvas> {
+        self.draw_frame(frame)
+    }
     fn clear_draw_frame(&mut self);
     fn artwork(&self) -> &CatalogArt;
 }
@@ -62,6 +69,17 @@ impl SceneAssets {
         &mut self,
         frame: &classicclassics_core::tiled::DrawFrame,
     ) -> Result<quasar_render_2d::Canvas> {
+        self.prepare_images(frame);
+        Ok(frame.fit(|id| self.drawn.get(&id).copied().unwrap_or(id)))
+    }
+    pub fn import_native(
+        &mut self,
+        frame: &classicclassics_core::tiled::DrawFrame,
+    ) -> Result<quasar_render_2d::Canvas> {
+        self.prepare_images(frame);
+        Ok(frame.native_canvas(|id| self.drawn.get(&id).copied().unwrap_or(id)))
+    }
+    fn prepare_images(&mut self, frame: &classicclassics_core::tiled::DrawFrame) {
         if let Some((id, _)) = self.frame.take() {
             self.textures.remove(id);
         }
@@ -78,7 +96,6 @@ impl SceneAssets {
                 .entry(*id)
                 .or_insert_with(|| self.textures.insert(image.clone()));
         }
-        Ok(frame.fit(|id| self.drawn.get(&id).copied().unwrap_or(id)))
     }
 }
 impl SceneTarget for SceneAssets {
@@ -90,6 +107,12 @@ impl SceneTarget for SceneAssets {
         frame: &classicclassics_core::tiled::DrawFrame,
     ) -> Result<quasar_render_2d::Canvas> {
         self.import_frame(frame)
+    }
+    fn import_native_frame(
+        &mut self,
+        frame: &classicclassics_core::tiled::DrawFrame,
+    ) -> Result<quasar_render_2d::Canvas> {
+        SceneAssets::import_native(self, frame)
     }
     fn artwork(&self) -> &CatalogArt {
         &self.artwork

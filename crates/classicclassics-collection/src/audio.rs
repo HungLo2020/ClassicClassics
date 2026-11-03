@@ -165,6 +165,20 @@ fn load_imported_sounds(
                 }
             }
         }
+        crate::GameKind::FruitSlicer => {
+            let audio = root.join("audio");
+            for file in classicclassics_fruitslicer::audio_cues::EFFECTS {
+                sounds.insert(
+                    ("fruitslicer", file),
+                    LoadedSound::Clip(audio.join(file).load::<ClipLoader>()?),
+                );
+            }
+            let file = classicclassics_fruitslicer::audio_cues::MUSIC;
+            sounds.insert(
+                ("fruitslicer", file),
+                LoadedSound::Stream(audio.join(file).load::<StreamLoader>()?),
+            );
+        }
         _ => {}
     }
     Ok(sounds)

@@ -1,10 +1,10 @@
 # Imported games
 
-MicroMages, Jackal, MissileCommand and RiverRaid are now owned workspace game
-crates in Classic Classics. They are copied source imports, not Git dependencies,
-submodules, subprocesses or independent applications. Future gameplay development
-belongs here; the source repositories have not been changed. Each crate's
-`UPSTREAM.md` records the exact GitHub source commit.
+MicroMages, Jackal, MissileCommand, RiverRaid and FruitSlicer are now owned
+workspace game crates in Classic Classics. They are copied source imports, not
+Git dependencies, submodules, subprocesses or independent applications. Future
+gameplay development belongs here; the source repositories have not been changed.
+Each crate's `UPSTREAM.md` records the exact GitHub source commit.
 
 | Crate | Original simulation rate | Retained presentation |
 |---|---|---|
@@ -12,6 +12,7 @@ belongs here; the source repositories have not been changed. Each crate's
 | `classicclassics-jackal` | 60.0988 Hz | PNG renderer, six-stage campaign, cinematics, original WAV music/effects |
 | `classicclassics-missile-command` | 61.03515625 Hz | Original 256×231 software renderer and arcade rules |
 | `classicclassics-river-raid` | 60 Hz | Original 160×210 software renderer, river generator and fuel rules |
+| `classicclassics-fruitslicer` | 120 Hz | Original 1280×720 sprite renderer, retained mode/pause/game-over menus and generated WAV/Ogg audio |
 
 ## Scope of the adapters
 
@@ -40,9 +41,16 @@ retain the cached single-image adapter. Redraws between video ticks and paused
 frames reuse their RGBA allocations. Production hosts use `Session::render`;
 the retained software renderers and geometry-only `scene` API provide reference
 comparisons. All paths share Quasar scaling, controls and settings overlays.
+Fruit Slicer instead exposes a native-resolution `canvas_frame` with its own
+image set; the collection imports those textures without 4:3 letterboxing or a
+CPU raster round trip.
 
 PNG decoding now uses the shared Quasar loader; game-specific palette conversion
-and pixel fixtures preserve the recovered rendering behavior. See [Shared assets](assets.md). Imported modules retain their source
+and pixel fixtures preserve the recovered rendering behavior. Fruit Slicer's
+PNG atlas, bitmap font, WAV effects and Ogg music are decoded through the same
+mount when the game is selected; its `Art` keeps the decoded images beside the
+texture identifiers so the host can import them once per frame. See
+[Shared assets](assets.md). Imported modules retain their source
 formatting and permit a few legacy Clippy style lints. Development builds optimize
 these CPU renderers and the core helpers, while host code remains debuggable.
 
@@ -54,13 +62,16 @@ simulation thread. Playback never synchronously loads/decodes a missing clip.
 Music stops at the catalog and pauses with Settings or the game. Source loop
 regions are retained; Micro Mages' fade-out cue currently stops immediately.
 Standalone effect-priority rules use the collection's shared bus/voice limits.
-The other games' semantic sound events use generated effects.
+The other games' semantic sound events use generated effects. Fruit Slicer uses
+its retained WAV slice/bomb/combo cues and looping dojo music through the same
+prepared-handle path; menu actions use its original click clip.
 
 ## Launcher artwork
 
-All four imported games use the same covers as their standalone Basalt packages.
+All five imported games use the same covers as their standalone Basalt packages.
 Micro Mages' cover comes from `packaging/artwork/cover.png`, Jackal's from
-`packaging/artwork/cover.jpg`, and Missile Command/River Raid from `assets/cover.png`.
+`packaging/artwork/cover.jpg`, Missile Command/River Raid from `assets/cover.png`,
+and Fruit Slicer from `app/basalt/cover.png`.
 Jackal's PNG is a lossless conversion of that JPEG. Source hashes, pixel checksums
 and credits are recorded in [artwork-sources.json](artwork-sources.json) and the
 sprite games' `assets/basalt/sources.json` files. The original cover pixels are
@@ -79,10 +90,16 @@ keeping their assignments and explicitly disabled actions.
 | Jackal | WASD / D-pad or left stick | LMB / South: gun | Shift or RMB / West: grenade; Enter / South: start; Tab / North: select 1–2 players on title |
 | Missile Command | Mouse, WASD, D-pad or left stick: aim | LMB / South: center battery | Shift or RMB / West: left battery; Space or MMB / North: right battery; Enter / South: start |
 | River Raid | A/D: steer, W/S: speed / D-pad or left stick | LMB / South: fire | Enter / South: start |
+| Fruit Slicer | Mouse/touchpad or left stick: blade | Hold LMB / South: slice | Enter / South: menu confirm; P: pause menu; R: restart |
 
 P pauses, R restarts, Escape opens Settings, and Backspace returns to the catalog.
 The existing Pong/ship controls remain separate from the imported games' movement
 so player two's arrows cannot steer player one.
+
+Fruit Slicer keeps its original mode-select, pause, options, help and game-over
+menus. Its menu focus is driven by the shared menu actions and pointer, while
+Escape still opens the collection Settings overlay and Backspace still returns
+to the catalog.
 
 Micro Mages preserves its 1–4 player setup and Jackal preserves 1–2 players. Player
 two can use arrows with Numpad 0 (fire), Numpad 1 (jump) and Numpad 2 (grenade).
@@ -92,12 +109,14 @@ use. Select the desired player count in the game's original setup screens.
 
 ## Assets, records and packaging
 
-The two sprite games retain their complete exported asset trees under their game
+The sprite games retain their complete exported asset trees under their game
 crates. Packaging copies them to `app/games/micromages/` and `app/games/jackal/`.
-An installed executable resolves those paths using Basalt's environment or its
-own `app/bin/` location; it never depends on a source checkout. Cargo builds use
-the crate-local asset trees. Runtime writes still go only to the collection's
-`data/` directories. The archive verifier checks that every required asset ships.
+Fruit Slicer's generated PNG, font and WAV/Ogg tree ships under
+`app/games/fruitslicer/` the same way. An installed executable resolves those
+paths using Basalt's environment or its own `app/bin/` location; it never depends
+on a source checkout. Cargo builds use the crate-local asset trees. Runtime writes
+still go only to the collection's `data/` directories. The archive verifier checks
+that every required asset ships.
 
 Each imported game adds its own defaulted record entry to `data/save/records.json`.
 The original Pong, Lander and Asteroids record entries retain their schema.
@@ -108,3 +127,5 @@ retained. Tests for retired standalone executables/settings hosts are replaced b
 collection tests. `classicclassics-collection/tests/imported_games.rs` compares
 adapter sessions directly with original simulation sessions, checks multiplayer,
 battery edges, pause/restart and Quasar decoding of the original audio assets.
+Fruit Slicer checks its retained menus, 1280×720 native frame, autoplay slicing,
+shared pause/resume actions and record merging.

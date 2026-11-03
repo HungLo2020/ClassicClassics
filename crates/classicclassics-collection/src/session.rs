@@ -203,6 +203,9 @@ impl Session {
                 }
                 game.tick(input, &mut self.sounds);
                 game.record(&mut self.records);
+                if game.quit_requested() {
+                    return true;
+                }
                 false
             }
         }
@@ -216,9 +219,9 @@ impl Session {
     }
 
     pub fn canvas_size(&self) -> (u32, u32) {
-        match self.screen {
+        match &self.screen {
             Screen::Menu => (menu::WIDTH, menu::HEIGHT),
-            Screen::Game(_) => (crate::WIDTH, crate::HEIGHT),
+            Screen::Game(game) => game.canvas_size(),
         }
     }
 
@@ -244,6 +247,8 @@ impl Session {
             Screen::Game(game) => {
                 if let Some(frame) = game.draw_frame(&hints) {
                     target.draw_frame(&frame)?
+                } else if let Some(frame) = game.canvas_frame(&hints) {
+                    target.import_native_frame(&frame)?
                 } else {
                     target.clear_draw_frame();
                     match game.pixel_frame(&hints) {

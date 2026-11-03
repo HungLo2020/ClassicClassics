@@ -14,6 +14,8 @@ publish = false
 quasar-tilemap = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false, features = ["render-2d"] }
 classicclassics-assets = { path = "crates/classicclassics-assets" }
 quasar-assets = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false }
+quasar-animation = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false }
+quasar-sim = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false, features = ["serde"] }
 quasar-ui = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false, features = ["render2d"] }
 quasar-audio = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false }
 quasar-config = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false, features = ["json", "toml"] }
@@ -36,6 +38,7 @@ classicclassics-micromages = { path = "crates/classicclassics-micromages" }
 classicclassics-jackal = { path = "crates/classicclassics-jackal" }
 classicclassics-missile-command = { path = "crates/classicclassics-missile-command" }
 classicclassics-river-raid = { path = "crates/classicclassics-river-raid" }
+classicclassics-fruitslicer = { path = "crates/classicclassics-fruitslicer" }
 
 [package]
 name = "classicclassics"

@@ -29,10 +29,16 @@ impl AssetSource for TrackedSource {
 
 #[test]
 fn gameplay_rendering_and_restart_reuse_prepared_assets_without_reads() {
-    for kind in [GameKind::MicroMages, GameKind::Jackal] {
+    for kind in [
+        GameKind::MicroMages,
+        GameKind::Jackal,
+        GameKind::FruitSlicer,
+    ] {
         let path = match kind {
             GameKind::MicroMages => classicclassics_micromages::assets::default_root(),
             GameKind::Jackal => classicclassics_jackal::assets::Assets::default_directory(),
+            GameKind::FruitSlicer => std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../classicclassics-fruitslicer/assets"),
             _ => unreachable!(),
         };
         let allowed = Arc::new(AtomicBool::new(true));

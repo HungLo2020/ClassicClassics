@@ -117,6 +117,11 @@ plus shared images. Use Quasar's preloaded tilesets and runtime edits; keep devi
 handles in the host. See [Quasar tilemaps](quasar-tilemaps.md) for caching,
 palette/mask semantics and ownership.
 
+A game that owns a native logical canvas outside the 4:3 tile layout can implement
+`ArcadeGame::canvas_frame` and override `ArcadeGame::canvas_size`. The collection
+imports its images and presents the canvas at its native resolution without
+letterboxing, as Fruit Slicer does at 1280×720.
+
 An imported software renderer can implement `ArcadeGame::pixel_frame` and return a
 `PixelFrame` containing a cached Quasar `Image`, aspect ratio and help text. Keep
 `FrameCache` out of Serde snapshots and invalidate it only on original video ticks
