@@ -26,6 +26,9 @@ pub struct Session {
     pub controls: Controls,
     pub controls_screen: Option<ControlsScreen>,
     pub selected: usize,
+    wheel_remainder: f32,
+    catalog_scroll: f32,
+    catalog_scroll_target: f32,
     pub records: Records,
     pub settings: Settings,
     pub sounds: Vec<Sound>,
@@ -43,6 +46,9 @@ impl Session {
             controls: Controls::default(),
             controls_screen: None,
             selected: 0,
+            wheel_remainder: 0.0,
+            catalog_scroll: 0.0,
+            catalog_scroll_target: 0.0,
             records,
             settings,
             sounds: Vec::new(),
@@ -187,11 +193,27 @@ impl Session {
                 }
                 let previous = self.selected;
                 self.selected = menu::navigate(self.selected, input, GameKind::ALL.len());
+                self.wheel_remainder = (self.wheel_remainder + input.ui_scroll).clamp(-10.0, 10.0);
+                while self.wheel_remainder.abs() >= 1.0 {
+                    let down = self.wheel_remainder < 0.0;
+                    self.selected =
+                        menu::scroll_selection(self.selected, GameKind::ALL.len(), down);
+                    self.wheel_remainder += if down { 1.0 } else { -1.0 };
+                }
+                if self.selected != previous {
+                    self.catalog_scroll_target = menu::scroll_offset(self.selected);
+                }
+                let difference = self.catalog_scroll_target - self.catalog_scroll;
+                self.catalog_scroll = if difference.abs() < 0.1 {
+                    self.catalog_scroll_target
+                } else {
+                    self.catalog_scroll + difference * 0.12
+                };
                 let mut mouse_launch = false;
-                if (input.ui_click || input.ui_pointer_moved)
+                if (input.ui_click || (input.ui_pointer_moved && input.ui_scroll == 0.0))
                     && let Some(pointer) = input.ui_pointer
                     && let Some((selected, launch)) =
-                        menu::click(self.selected, GameKind::ALL.len(), pointer)
+                        menu::click(self.catalog_scroll, GameKind::ALL.len(), pointer)
                     && (input.ui_click || launch)
                 {
                     self.selected = selected;
@@ -244,7 +266,7 @@ impl Session {
     pub fn scene(&mut self) -> Canvas {
         let hints = self.controls.hints();
         let base = match &self.screen {
-            Screen::Menu => menu::scene(self.selected, &self.records, &hints),
+            Screen::Menu => menu::scene(self.selected, self.catalog_scroll, &self.records, &hints),
             Screen::Game(game) => game.scene(&hints),
         };
         self.overlay(base)
@@ -258,7 +280,13 @@ impl Session {
         let base = match &self.screen {
             Screen::Menu => {
                 target.clear_draw_frame();
-                menu::scene_with_art(self.selected, &self.records, &hints, target.artwork())
+                menu::scene_with_art(
+                    self.selected,
+                    self.catalog_scroll,
+                    &self.records,
+                    &hints,
+                    target.artwork(),
+                )
             }
             Screen::Game(game) => {
                 if let Some(frame) = game.draw_frame(&hints) {
@@ -419,7 +447,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hover_selects_cards_without_overriding_keyboard_or_switching_pages() {
+    fn hover_selects_cards_without_overriding_keyboard_navigation() {
         let mut session = Session::new(Records::default(), Settings::default());
         session.tick(Input {
             ui_pointer: Some([700.0, 200.0]),
@@ -439,6 +467,79 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(session.selected, 2);
+    }
+
+    #[test]
+    fn hovering_preview_does_not_scroll_but_navigation_animates() {
+        let mut session = Session::new(Records::default(), Settings::default());
+        session.tick(Input {
+            ui_pointer: Some([100.0, 970.0]),
+            ui_pointer_moved: true,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 6);
+        for _ in 0..30 {
+            session.tick(Input::default());
+        }
+        assert_eq!(session.catalog_scroll, 0.0);
+        session.tick(Input {
+            menu_right: true,
+            ..Default::default()
+        });
+        let target = menu::scroll_offset(7);
+        assert!(session.catalog_scroll > 0.0 && session.catalog_scroll < target);
+        let before = session.catalog_scroll;
+        session.tick(Input::default());
+        assert!(session.catalog_scroll > before && session.catalog_scroll < target);
+        for _ in 0..120 {
+            session.tick(Input::default());
+        }
+        assert_eq!(session.catalog_scroll, target);
+    }
+
+    #[test]
+    fn clicks_hit_cards_at_the_animated_position() {
+        let mut session = Session::new(Records::default(), Settings::default());
+        session.selected = 3;
+        session.tick(Input {
+            menu_down: true,
+            ..Default::default()
+        });
+        assert!(session.catalog_scroll > 0.0);
+        let hit = menu::click(session.catalog_scroll, GameKind::ALL.len(), [100.0, 600.0]);
+        assert_eq!(hit, Some((3, true)));
+    }
+
+    #[test]
+    fn wheel_accumulates_and_moves_highlight_without_wrapping() {
+        let mut session = Session::new(Records::default(), Settings::default());
+        session.tick(Input {
+            ui_scroll: -0.5,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 0);
+        session.tick(Input {
+            ui_scroll: -0.5,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 3);
+        session.tick(Input {
+            ui_scroll: -1.0,
+            ui_pointer: Some([100.0, 200.0]),
+            ui_pointer_moved: true,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 6);
+        session.tick(Input {
+            ui_scroll: -1.0,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 6);
+        session.tick(Input {
+            ui_scroll: 1.0,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 3);
     }
 
     #[test]

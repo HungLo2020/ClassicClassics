@@ -96,9 +96,8 @@ fn textured_frame_preserves_pixel_colors_and_four_by_three_geometry() {
 }
 
 #[test]
-fn both_catalog_pages_use_the_complete_basalt_covers_at_portrait_aspect() {
+fn catalog_uses_complete_basalt_covers_at_portrait_aspect() {
     let mut assets = SceneAssets::new().unwrap();
-    let mut session = Session::new(Records::default(), Settings::default());
     for kind in COVERED {
         let texture = assets
             .artwork
@@ -106,10 +105,20 @@ fn both_catalog_pages_use_the_complete_basalt_covers_at_portrait_aspect() {
             .expect("Basalt cover must be registered");
         let image = assets.textures.get(texture).unwrap();
         assert_eq!(image.width() * 4, image.height() * 3);
-        session.selected = GameKind::ALL
+        let index = GameKind::ALL
             .iter()
             .position(|candidate| *candidate == kind)
             .unwrap();
+        let mut session = Session::new(Records::default(), Settings::default());
+        for _ in 0..index {
+            session.tick(classicclassics_collection::Input {
+                menu_right: true,
+                ..Default::default()
+            });
+        }
+        for _ in 0..120 {
+            session.tick(Default::default());
+        }
         let canvas = session.render(&mut assets).unwrap();
         canvas.validate(&assets.textures).unwrap();
         let cover: Vec<_> = canvas

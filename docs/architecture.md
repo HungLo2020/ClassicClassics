@@ -41,9 +41,9 @@ package metadata lookup, executable paths and the release archive layout.
 
 ## Catalog and logical canvases
 
-The catalog uses a 1920×1080 draw list with six card slots in a three-column,
-two-row grid. Page selection follows the highlighted game; subsequent games
-appear on later pages. Left/right advances through games, and up/down moves
+The catalog uses a 1920×1080 draw list with a vertically scrolling three-column
+grid. Two complete rows and a preview of the next row are visible. The view
+follows the highlighted game, and the mouse wheel moves the selection by row. Left/right advances through games, and up/down moves
 within a column, wrapping over existing rows. With only one row, up/down
 also advances through games. Only registered games are shown.
 Game metadata, motifs and record labels come from their own crates.

@@ -359,6 +359,7 @@ fn build_input(keyboard: &InputState, gamepad: &InputState, stick: &mut StickNav
         ui_pointer: None,
         ui_click: false,
         ui_pointer_moved: false,
+        ui_scroll: 0.0,
         fire: fire.held(),
         fire_pressed: fire.pressed,
         hyperspace: merged_action(keyboard, gamepad, controls::HYPERSPACE).pressed,
@@ -837,6 +838,8 @@ impl App {
             }
             input.ui_click = self.keyboard.mouse_pressed(MouseButton::Left);
             input.ui_pointer_moved = cursor != self.last_game_pointer;
+            input.ui_scroll =
+                (self.keyboard.scroll_lines.1 + self.keyboard.scroll_pixels.1 / 80.0) as f32;
             if cursor != self.last_game_pointer {
                 self.last_game_pointer = cursor;
                 input.pointer = Viewport::calculate(

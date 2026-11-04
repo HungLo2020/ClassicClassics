@@ -1,11 +1,10 @@
-//! Six-card catalog pages. Game-specific presentation lives in game crates.
+//! Scrolling catalog grid. Game-specific presentation lives in game crates.
 use crate::VERSION;
 use crate::controls::ControlHints;
 use crate::games::{GameKind, Records};
 use crate::paint::{CYAN, DIM, GRID, MUTED, Paint, WHITE};
 use crate::rendering::CatalogArt;
 use quasar_render_2d::{Canvas, Rect, Sprite};
-use std::ops::Range;
 
 pub const WIDTH: u32 = 1920;
 pub const HEIGHT: u32 = 1080;
@@ -17,10 +16,29 @@ const CARD_HEIGHT: f32 = 368.0;
 const LEFT: f32 = 80.0;
 const TOP: f32 = 184.0;
 const GAP: f32 = 40.0;
+const ROW_GAP: f32 = 20.0;
+const VIEW_BOTTOM: f32 = 1000.0;
+const ROW_PITCH: f32 = CARD_HEIGHT + ROW_GAP;
 
-fn page(selected: usize, count: usize) -> Range<usize> {
-    let start = selected.min(count.saturating_sub(1)) / PAGE_SIZE * PAGE_SIZE;
-    start..(start + PAGE_SIZE).min(count)
+pub fn scroll_offset(selected: usize) -> f32 {
+    (selected / COLUMNS).saturating_sub(1) as f32 * ROW_PITCH
+}
+
+/// Move by one row without wrapping when using the wheel.
+pub fn scroll_selection(selected: usize, count: usize, down: bool) -> usize {
+    if count == 0 {
+        return 0;
+    }
+    let selected = selected.min(count - 1);
+    if down {
+        if selected / COLUMNS >= (count - 1) / COLUMNS {
+            selected
+        } else {
+            (selected + COLUMNS).min(count - 1)
+        }
+    } else {
+        selected.saturating_sub(COLUMNS)
+    }
 }
 
 /// Spatial navigation across a three-column grid, wrapping at the ends.
@@ -58,50 +76,37 @@ pub fn navigate(selected: usize, input: crate::Input, count: usize) -> usize {
     selected
 }
 
-/// Resolve a click against the visible cards and page controls.
-pub fn click(selected: usize, count: usize, [x, y]: [f32; 2]) -> Option<(usize, bool)> {
-    let visible = page(selected, count);
-    if (100.0..160.0).contains(&y) && count > PAGE_SIZE {
-        if (1460.0..1620.0).contains(&x) {
-            return Some((
-                if visible.start == 0 {
-                    (count - 1) / PAGE_SIZE * PAGE_SIZE
-                } else {
-                    visible.start - PAGE_SIZE
-                },
-                false,
-            ));
-        }
-        if (1620.0..1840.0).contains(&x) {
-            return Some(((visible.start + PAGE_SIZE) % count, false));
-        }
+/// Resolve a pointer against the clipped, scrolled card grid.
+pub fn click(offset: f32, count: usize, [x, y]: [f32; 2]) -> Option<(usize, bool)> {
+    if !(TOP..VIEW_BOTTOM).contains(&y) {
+        return None;
     }
-    for (slot, index) in visible.enumerate() {
-        let left = LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP);
-        let top = TOP + (slot / COLUMNS) as f32 * (CARD_HEIGHT + GAP);
-        if (left..left + CARD_WIDTH).contains(&x) && (top..top + CARD_HEIGHT).contains(&y) {
-            return Some((index, true));
-        }
-    }
-    None
+    (0..count).find_map(|index| {
+        let left = LEFT + (index % COLUMNS) as f32 * (CARD_WIDTH + GAP);
+        let top = TOP + (index / COLUMNS) as f32 * ROW_PITCH - offset;
+        ((left..left + CARD_WIDTH).contains(&x) && (top..top + CARD_HEIGHT).contains(&y))
+            .then_some((index, true))
+    })
 }
 
-pub fn scene(selected: usize, records: &Records, hints: &ControlHints) -> Canvas {
-    catalog_scene(&GameKind::ALL, selected, records, hints, None)
+pub fn scene(selected: usize, offset: f32, records: &Records, hints: &ControlHints) -> Canvas {
+    catalog_scene(&GameKind::ALL, selected, offset, records, hints, None)
 }
 
 pub fn scene_with_art(
     selected: usize,
+    offset: f32,
     records: &Records,
     hints: &ControlHints,
     art: &CatalogArt,
 ) -> Canvas {
-    catalog_scene(&GameKind::ALL, selected, records, hints, Some(art))
+    catalog_scene(&GameKind::ALL, selected, offset, records, hints, Some(art))
 }
 
 fn catalog_scene(
     games: &[GameKind],
     selected: usize,
+    offset: f32,
     records: &Records,
     hints: &ControlHints,
     artwork: Option<&CatalogArt>,
@@ -125,35 +130,27 @@ fn catalog_scene(
         MUTED,
     );
     paint.right(1840.0, 82.0, &format!("COLLECTION v{VERSION}"), 2.0, DIM);
-    let visible = page(selected, games.len());
-    paint.right(
-        1840.0,
-        140.0,
-        &format!(
-            "PAGE {} / {}",
-            visible.start / PAGE_SIZE + 1,
-            games.len().div_ceil(PAGE_SIZE).max(1)
-        ),
-        2.0,
-        DIM,
-    );
     if games.len() > PAGE_SIZE {
-        paint.text(1460.0, 116.0, "< PREV", 2.0, CYAN);
-        paint.text(1640.0, 116.0, "NEXT >", 2.0, CYAN);
+        paint.right(1840.0, 140.0, "SCROLL FOR MORE", 2.0, DIM);
     }
-    for (slot, index) in visible.enumerate() {
-        let x = LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP);
-        let y = TOP + (slot / COLUMNS) as f32 * (CARD_HEIGHT + GAP);
-        card(
-            &mut paint,
-            x,
-            y,
-            games[index],
-            index == selected,
-            records,
-            artwork,
-        );
+    let mut canvas = paint.into_canvas();
+    canvas.set_clip(Some(Rect::new(
+        0.0,
+        TOP - 5.0,
+        WIDTH as f32,
+        VIEW_BOTTOM - TOP + 5.0,
+    )));
+    let mut paint = Paint::over(canvas);
+    for (index, kind) in games.iter().copied().enumerate() {
+        let x = LEFT + (index % COLUMNS) as f32 * (CARD_WIDTH + GAP);
+        let y = TOP + (index / COLUMNS) as f32 * ROW_PITCH - offset;
+        if y + CARD_HEIGHT + 5.0 > TOP && y - 5.0 < VIEW_BOTTOM {
+            card(&mut paint, x, y, kind, index == selected, records, artwork);
+        }
     }
+    let mut canvas = paint.into_canvas();
+    canvas.set_clip(None);
+    let mut paint = Paint::over(canvas);
     paint.rect(LEFT, 1000.0, 1760.0, 1.0, GRID);
     paint.text(
         LEFT,
@@ -291,51 +288,27 @@ mod tests {
     use crate::Input;
 
     #[test]
-    fn six_cards_fit_and_later_pages_keep_selection_visible() {
-        assert_eq!(page(5, 8), 0..6);
-        assert_eq!(page(6, 8), 6..8);
-        for slot in 0..PAGE_SIZE {
-            let x = LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP);
-            let y = TOP + (slot / COLUMNS) as f32 * (CARD_HEIGHT + GAP);
-            assert!(x >= 5.0 && x + CARD_WIDTH + 5.0 <= WIDTH as f32);
-            assert!(y >= 5.0 && y + CARD_HEIGHT + 5.0 < 1000.0);
-        }
-        // Repeated entries exercise six populated slots without adding fake games.
+    fn catalog_previews_next_row_and_scrolls_selected_row_into_view() {
+        assert_eq!(scroll_offset(0), 0.0);
+        assert_eq!(scroll_offset(5), 0.0);
+        assert_eq!(scroll_offset(6), ROW_PITCH);
         let games = [GameKind::Pong; 8];
         for selected in 0..games.len() {
             let canvas = catalog_scene(
                 &games,
                 selected,
+                scroll_offset(selected),
                 &Records::default(),
                 &ControlHints::default(),
                 None,
             );
-            assert_eq!((canvas.width(), canvas.height()), (1920, 1080));
             canvas.validate(&Default::default()).unwrap();
         }
-        let canvas = catalog_scene(
-            &games,
-            5,
-            &Records::default(),
-            &ControlHints::default(),
-            None,
-        );
-        let pixels = quasar_render_2d::reference::rasterize(&canvas, &Default::default()).unwrap();
-        for slot in 0..PAGE_SIZE {
-            let x = (LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP)) as usize;
-            let y = (TOP + (slot / COLUMNS) as f32 * (CARD_HEIGHT + GAP)) as usize;
-            let offset = (y * WIDTH as usize + x) * 4;
-            let expected = if slot == 5 {
-                GameKind::Pong.accent()
-            } else {
-                GRID
-            };
-            assert_eq!(
-                &pixels[offset..offset + 4],
-                &expected,
-                "card {slot} must be visible"
-            );
-        }
+        assert_eq!(scroll_selection(0, 8, true), 3);
+        assert_eq!(scroll_selection(3, 8, true), 6);
+        assert_eq!(scroll_selection(5, 8, true), 7);
+        assert_eq!(scroll_selection(7, 8, true), 7);
+        assert_eq!(scroll_selection(6, 8, false), 3);
     }
 
     #[test]
@@ -361,15 +334,12 @@ mod tests {
 #[cfg(test)]
 mod pointer_tests {
     use super::*;
-
     #[test]
-    fn clicks_select_visible_cards_and_switch_pages() {
-        assert_eq!(click(0, 8, [100.0, 200.0]), Some((0, true)));
-        assert_eq!(click(0, 8, [700.0, 200.0]), Some((1, true)));
-        assert_eq!(click(0, 8, [1700.0, 120.0]), Some((6, false)));
-        assert_eq!(click(6, 8, [100.0, 200.0]), Some((6, true)));
-        assert_eq!(click(0, 8, [1500.0, 120.0]), Some((6, false)));
-        assert_eq!(click(6, 8, [1500.0, 120.0]), Some((0, false)));
-        assert_eq!(click(6, 8, [1300.0, 200.0]), None);
+    fn clicks_follow_scrolling_and_clipping() {
+        assert_eq!(click(0.0, 8, [100.0, 200.0]), Some((0, true)));
+        assert_eq!(click(0.0, 8, [100.0, 970.0]), Some((6, true)));
+        assert_eq!(click(ROW_PITCH, 8, [100.0, 200.0]), Some((3, true)));
+        assert_eq!(click(ROW_PITCH, 8, [100.0, 590.0]), Some((6, true)));
+        assert_eq!(click(0.0, 8, [100.0, 1001.0]), None);
     }
 }

@@ -27,6 +27,8 @@ pub struct Input {
     pub ui_pointer: Option<[f32; 2]>,
     pub ui_click: bool,
     pub ui_pointer_moved: bool,
+    /// Vertical mouse-wheel movement in line units, positive upwards.
+    pub ui_scroll: f32,
     pub fire: bool,
     pub fire_pressed: bool,
     pub hyperspace: bool,

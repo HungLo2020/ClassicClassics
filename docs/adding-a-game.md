@@ -73,8 +73,8 @@ of serialized snapshots/saves. New record fields default when older saves lack
 them. More complex record migrations require an explicit schema migration.
 
 Registration supplies catalog entries, CLI aliases/help, game dispatch and the
-aggregate records automatically. The catalog lays out up to six games per page;
-paging follows the selection, including incomplete final pages. No game-specific
+aggregate records automatically. The catalog scrolls through games in a three-column grid, following the selection
+including incomplete final rows. No game-specific
 menu match arms are needed.
 
 Games choose the meaning of existing logical `Input` fields. They must not read

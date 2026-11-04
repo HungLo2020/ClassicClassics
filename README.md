@@ -26,16 +26,15 @@ and the [Basalt Game Standard](https://github.com/HungLo2020/Basalt/blob/main/ST
 | **Fruit Slicer** | Slicing arcade | Swipe fruit, chain combos and avoid bombs across Classic, Arcade and Zen runs. |
 
 The catalog screen is the entry point. It uses a 1920×1080 logical canvas with
-a three-column, two-row grid (six cards per page), and pages automatically as
-games are added. The first page holds six games; River Raid and Fruit Slicer
-are on page two.
+a vertically scrolling three-column grid. Two complete rows and a preview of
+the next row are visible at once.
 
 The game starts in borderless fullscreen on the detected monitor, with a
 1920×1080 fallback. Saved preferences and explicit `--windowed` or
 `--resolution WxH` arguments take precedence.
 
 Choose a game with **A/D**, **W/S** or
-the arrow keys, then press **Enter**, or click a game card. Use **Prev** and **Next** to change pages with the mouse. **Escape** opens Settings from the catalog
+the arrow keys, then press **Enter**, or click a game card. Use the mouse wheel to scroll through the games. **Escape** opens Settings from the catalog
 or freezes a running game. **Backspace** returns from a game to the catalog.
 **Q** always quits.
 

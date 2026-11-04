@@ -25,7 +25,7 @@ suite covers:
 - menu launch/back navigation, settings freeze and state serialization;
 - full draw-list validation through `Canvas::validate` and a 960×600 headless
   rasterisation;
-- six-card page bounds, navigation across partial rows and additional pages;
+- scrolling grid bounds, navigation across partial rows and wheel input;
 - registered game serialization and deterministic continuation, legacy record schemas;
 - TOML round trips, JSON preference migration, invalid-file preservation,
   monitor-resolution fallback and explicit windowed CLI precedence.
@@ -155,7 +155,7 @@ watch and verify both the Actions artifact and the ZIP Basalt downloads.
 
 `rendering.rs` integration tests guard one-sprite pixel presentation, immutable
 frame reuse between video ticks, unchanged simulation snapshots, correct pixel
-colors/aspect, and complete Basalt covers on both catalog pages. Cover pixels are
+colors/aspect, and complete Basalt covers throughout the catalog. Cover pixels are
 checked against independent source checksums in `docs/artwork-sources.json`.
 
 For repeatable CPU profiling after setup:
