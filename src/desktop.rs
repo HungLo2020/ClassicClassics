@@ -4,7 +4,7 @@
 
 #[path = "crt.rs"]
 mod crt;
-use crt::CrtRenderer;
+use crt::{CrtRenderer, CrtStyle};
 
 use classicclassics_collection::audio::{Audio, SoundBank};
 use classicclassics_collection::cli::Options;
@@ -657,6 +657,21 @@ impl App {
         self.session.render(&mut target)
     }
 
+    fn crt_style(&self) -> Option<CrtStyle> {
+        if !self.session.crt_active() {
+            return None;
+        }
+        match self.session.game_kind() {
+            Some(
+                classicclassics_collection::GameKind::Pong
+                | classicclassics_collection::GameKind::LunarLander
+                | classicclassics_collection::GameKind::Asteroids,
+            ) => Some(CrtStyle::Vector),
+            Some(_) => Some(CrtStyle::Raster),
+            None => None,
+        }
+    }
+
     fn display_options(&self) -> DisplayOptions {
         DisplayOptions {
             filter: if self.settings.linear {
@@ -923,7 +938,7 @@ impl App {
         let scene = self.scene()?;
         let scene_time = started.elapsed();
         let presenting = Instant::now();
-        let crt = self.session.crt_active();
+        let crt = self.crt_style();
         let outcome = self.presenter.as_mut().expect("presenter exists").present(
             &scene,
             &self.assets.textures,
@@ -1090,7 +1105,7 @@ impl App {
         };
         if self.presenter.is_some() {
             let scene = self.scene()?;
-            let crt = self.session.crt_active();
+            let crt = self.crt_style();
             let renderer = self.presenter.as_mut().expect("presenter exists");
             let pixels = renderer.render_to_image(&scene, &self.assets.textures, crt)?;
             quasar_render_2d::write_png(&path, scene.width(), scene.height(), &pixels)?;
@@ -1133,7 +1148,7 @@ impl App {
                 presenter.resize(0, 0);
                 let scene = self.scene()?;
                 let presenter = self.presenter.as_mut().expect("presenter exists");
-                if presenter.present(&scene, &self.assets.textures, false)?
+                if presenter.present(&scene, &self.assets.textures, None)?
                     != PresentOutcome::Deferred
                 {
                     return Err("zero-size surface was not deferred".into());

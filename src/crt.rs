@@ -9,6 +9,12 @@ use quasar_render_2d::{
 use std::sync::Arc;
 use vulkanic_gal as gpu;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CrtStyle {
+    Raster,
+    Vector,
+}
+
 pub struct CrtRenderer {
     gpu: Gpu,
     surface: FrameSurface,
@@ -18,10 +24,12 @@ pub struct CrtRenderer {
 }
 
 struct PostProcess {
-    _texture: gpu::Texture,
+    _textures: [gpu::Texture; 2],
     format: gpu::TextureFormat,
-    target: RenderTarget,
-    group: gpu::BindGroup,
+    targets: [RenderTarget; 2],
+    groups: [gpu::BindGroup; 2],
+    current: usize,
+    style: CrtStyle,
     pipeline: gpu::RenderPipeline,
     filter: Filter,
 }
@@ -32,17 +40,24 @@ impl PostProcess {
         target: &RenderTarget,
         source_size: (u32, u32),
         filter: Filter,
+        style: CrtStyle,
     ) -> GraphicsResult<Self> {
-        let texture = quasar_frame::texture_2d(
-            &gpu.device,
-            "CRT source",
-            source_size.0,
-            source_size.1,
-            gpu::TextureFormat::Rgba8Unorm,
-            gpu::TextureUsages::RENDER_ATTACHMENT | gpu::TextureUsages::TEXTURE_BINDING,
-        )?;
-        let source = RenderTarget::from_texture(&texture);
-        let (group, pipeline) = quasar_frame::validation_scope(gpu, || {
+        let make_texture = || {
+            quasar_frame::texture_2d(
+                &gpu.device,
+                "CRT source",
+                source_size.0,
+                source_size.1,
+                gpu::TextureFormat::Rgba8Unorm,
+                gpu::TextureUsages::RENDER_ATTACHMENT | gpu::TextureUsages::TEXTURE_BINDING,
+            )
+        };
+        let textures = [make_texture()?, make_texture()?];
+        let sources = [
+            RenderTarget::from_texture(&textures[0]),
+            RenderTarget::from_texture(&textures[1]),
+        ];
+        let (groups, pipeline) = quasar_frame::validation_scope(gpu, || {
             let layout = gpu
                 .device
                 .create_bind_group_layout(&gpu::BindGroupLayoutDescriptor {
@@ -64,6 +79,22 @@ impl PostProcess {
                             ty: gpu::BindingType::Sampler(gpu::SamplerBindingType::Filtering),
                             count: None,
                         },
+                        gpu::BindGroupLayoutEntry {
+                            binding: 2,
+                            visibility: gpu::ShaderStages::FRAGMENT,
+                            ty: gpu::BindingType::Texture {
+                                sample_type: gpu::TextureSampleType::Float { filterable: true },
+                                view_dimension: gpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                        gpu::BindGroupLayoutEntry {
+                            binding: 3,
+                            visibility: gpu::ShaderStages::FRAGMENT,
+                            ty: gpu::BindingType::Sampler(gpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
                     ],
                 });
             let sampler = gpu.device.create_sampler(&gpu::SamplerDescriptor {
@@ -80,20 +111,39 @@ impl PostProcess {
                 },
                 ..Default::default()
             });
-            let group = gpu.device.create_bind_group(&gpu::BindGroupDescriptor {
-                label: Some("CRT source"),
-                layout: &layout,
-                entries: &[
-                    gpu::BindGroupEntry {
-                        binding: 0,
-                        resource: gpu::BindingResource::TextureView(&source.color),
-                    },
-                    gpu::BindGroupEntry {
-                        binding: 1,
-                        resource: gpu::BindingResource::Sampler(&sampler),
-                    },
-                ],
+            let glow_sampler = gpu.device.create_sampler(&gpu::SamplerDescriptor {
+                label: Some("CRT glow sampler"),
+                mag_filter: gpu::FilterMode::Linear,
+                min_filter: gpu::FilterMode::Linear,
+                ..Default::default()
             });
+            let make_group = |current: usize| {
+                gpu.device.create_bind_group(&gpu::BindGroupDescriptor {
+                    label: Some("CRT source and previous frame"),
+                    layout: &layout,
+                    entries: &[
+                        gpu::BindGroupEntry {
+                            binding: 0,
+                            resource: gpu::BindingResource::TextureView(&sources[current].color),
+                        },
+                        gpu::BindGroupEntry {
+                            binding: 1,
+                            resource: gpu::BindingResource::Sampler(&sampler),
+                        },
+                        gpu::BindGroupEntry {
+                            binding: 2,
+                            resource: gpu::BindingResource::TextureView(
+                                &sources[1 - current].color,
+                            ),
+                        },
+                        gpu::BindGroupEntry {
+                            binding: 3,
+                            resource: gpu::BindingResource::Sampler(&glow_sampler),
+                        },
+                    ],
+                })
+            };
+            let groups = [make_group(0), make_group(1)];
             let shader = gpu
                 .device
                 .create_shader_module(gpu::ShaderModuleDescriptor {
@@ -123,7 +173,10 @@ impl PostProcess {
                     multisample: Default::default(),
                     fragment: Some(gpu::FragmentState {
                         module: &shader,
-                        entry_point: Some("fragment"),
+                        entry_point: Some(match style {
+                            CrtStyle::Raster => "raster",
+                            CrtStyle::Vector => "vector",
+                        }),
                         compilation_options: Default::default(),
                         targets: &[Some(gpu::ColorTargetState {
                             format: target.format,
@@ -134,13 +187,15 @@ impl PostProcess {
                     multiview_mask: None,
                     cache: None,
                 });
-            (group, pipeline)
+            (groups, pipeline)
         })?;
         Ok(Self {
-            _texture: texture,
+            _textures: textures,
             format: target.format,
-            target: source,
-            group,
+            targets: sources,
+            groups,
+            current: 0,
+            style,
             pipeline,
             filter,
         })
@@ -173,7 +228,7 @@ impl PostProcess {
             );
             pass.set_scissor_rect(viewport.x, viewport.y, viewport.width, viewport.height);
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &self.group, &[]);
+            pass.set_bind_group(0, &self.groups[self.current], &[]);
             pass.draw(0..3, 0..1);
         }
         encoder.finish()
@@ -245,30 +300,32 @@ impl CrtRenderer {
         &mut self,
         canvas: &Canvas,
         textures: &Textures,
-        crt: bool,
+        crt: Option<CrtStyle>,
     ) -> GraphicsResult<PresentOutcome> {
         let Some(frame) = self.surface.acquire(&self.gpu)? else {
             return Ok(PresentOutcome::Deferred);
         };
-        let commands = if crt {
+        let commands = if let Some(style) = crt {
             if self.post.as_ref().is_none_or(|p| {
-                p.target.size() != (canvas.width(), canvas.height())
+                p.targets[0].size() != (canvas.width(), canvas.height())
                     || p.format != frame.target.format
                     || p.filter != self.options.filter
+                    || p.style != style
             }) {
                 self.post = Some(PostProcess::new(
                     &self.gpu,
                     &frame.target,
                     (canvas.width(), canvas.height()),
                     self.options.filter,
+                    style,
                 )?);
             }
-            let post = self.post.as_ref().expect("CRT initialized");
+            let post = self.post.as_mut().expect("CRT initialized");
             let draw = self.state.prepare(
                 &self.gpu,
                 canvas,
                 textures,
-                &post.target,
+                &post.targets[post.current],
                 self.options,
                 LoadOp::Clear,
             )?;
@@ -278,11 +335,11 @@ impl CrtRenderer {
                 self.options,
             )
             .ok_or_else(|| quasar_frame::error("invalid CRT viewport"))?;
-            vec![
-                draw.commands,
-                post.commands(&self.gpu, &frame.target, viewport),
-            ]
+            let effect = post.commands(&self.gpu, &frame.target, viewport);
+            post.current = 1 - post.current;
+            vec![draw.commands, effect]
         } else {
+            self.post = None;
             vec![
                 self.state
                     .prepare(
@@ -304,15 +361,16 @@ impl CrtRenderer {
         &mut self,
         canvas: &Canvas,
         textures: &Textures,
-        crt: bool,
+        crt: Option<CrtStyle>,
     ) -> GraphicsResult<Vec<u8>> {
         let target = OffscreenTarget::new(&self.gpu, canvas.width(), canvas.height())?;
-        let post = if crt {
+        let post = if let Some(style) = crt {
             Some(PostProcess::new(
                 &self.gpu,
                 &target.target,
                 (canvas.width(), canvas.height()),
                 self.options.filter,
+                style,
             )?)
         } else {
             None
@@ -323,7 +381,7 @@ impl CrtRenderer {
                     gpu,
                     canvas,
                     textures,
-                    &post.target,
+                    &post.targets[post.current],
                     self.options,
                     LoadOp::Clear,
                 )?;
@@ -343,5 +401,93 @@ impl CrtRenderer {
             }
         })?;
         Ok(result.rgba)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quasar_render_2d::Rect;
+
+    fn render_frame(
+        gpu: &Gpu,
+        state: &mut RenderState2D,
+        post: &mut PostProcess,
+        output: &OffscreenTarget,
+        canvas: &Canvas,
+    ) -> Vec<u8> {
+        let options = DisplayOptions::default();
+        let viewport = Viewport::calculate((64, 64), (64, 64), options).unwrap();
+        let image = output
+            .render(gpu, |gpu, target| {
+                let draw = state.prepare(
+                    gpu,
+                    canvas,
+                    &Textures::default(),
+                    &post.targets[post.current],
+                    options,
+                    LoadOp::Clear,
+                )?;
+                Ok(vec![draw.commands, post.commands(gpu, target, viewport)])
+            })
+            .unwrap();
+        post.current = 1 - post.current;
+        image.rgba
+    }
+
+    #[test]
+    #[ignore = "requires a working native GPU or software Vulkan adapter"]
+    fn vector_afterglow_uses_previous_frame_and_resets_on_recreation() {
+        let gpu = Gpu::headless().unwrap();
+        let mut state = RenderState2D::new(&gpu).unwrap();
+        let output = OffscreenTarget::new(&gpu, 64, 64).unwrap();
+        let mut post = PostProcess::new(
+            &gpu,
+            &output.target,
+            (64, 64),
+            Filter::Nearest,
+            CrtStyle::Vector,
+        )
+        .unwrap();
+        let mut bright = Canvas::new(64, 64).unwrap();
+        bright.rect(Rect::new(16.0, 16.0, 32.0, 32.0), [255, 255, 255, 255]);
+        let dark = Canvas::new(64, 64).unwrap();
+        render_frame(&gpu, &mut state, &mut post, &output, &bright);
+        let afterglow = render_frame(&gpu, &mut state, &mut post, &output, &dark);
+        let mut fresh = PostProcess::new(
+            &gpu,
+            &output.target,
+            (64, 64),
+            Filter::Nearest,
+            CrtStyle::Vector,
+        )
+        .unwrap();
+        let reset = render_frame(&gpu, &mut state, &mut fresh, &output, &dark);
+        let center = (32 * 64 + 32) * 4;
+        assert!(afterglow[center] > reset[center] + 20);
+        assert_eq!(reset[center], 0);
+
+        let mut raster = PostProcess::new(
+            &gpu,
+            &output.target,
+            (64, 64),
+            Filter::Nearest,
+            CrtStyle::Raster,
+        )
+        .unwrap();
+        let raster_pixels = render_frame(&gpu, &mut state, &mut raster, &output, &bright);
+        assert!(
+            (20..44).any(|x| {
+                let i = (32 * 64 + x) * 4;
+                raster_pixels[i] != raster_pixels[i + 1]
+                    || raster_pixels[i + 1] != raster_pixels[i + 2]
+            }),
+            "raster display should have an RGB phosphor pattern"
+        );
+        let raster_dark = render_frame(&gpu, &mut state, &mut raster, &output, &dark);
+        assert_eq!(
+            raster_dark[center], 0,
+            "raster path should not retain vector afterglow"
+        );
     }
 }

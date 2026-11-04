@@ -75,7 +75,7 @@ the simulation and offers:
   the selected dimensions are used when windowed.
 - **Filtering** — Sharp (nearest) or Smooth (linear).
 - **Scaling** — Fit or Integer.
-- **CRT filter** — toggle a CRT-style shader for games; catalog and pause screens stay clear.
+- **CRT filter** — toggle a CRT-style shader for games; catalog and pause screens stay clear. Pixel games receive scan beams and an RGB phosphor grille; vector games use glow and a short afterglow.
 - **Master volume** — adjust in 5% steps.
 - **Mute** — toggle output without losing the saved volume.
 - **Controls** — edit the global keyboard, mouse and gamepad action preset.
