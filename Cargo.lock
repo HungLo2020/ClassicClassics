@@ -339,12 +339,14 @@ dependencies = [
  "quasar-app",
  "quasar-config",
  "quasar-core",
+ "quasar-frame",
  "quasar-input",
  "quasar-render-2d",
  "quasar-storage",
  "quasar-ui",
  "quasar-window",
  "tempfile",
+ "vulkanic-gal",
 ]
 
 [[package]]

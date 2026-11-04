@@ -283,6 +283,10 @@ impl ArcadeGame for Game {
         accent: classicclassics_core::paint::AMBER,
     };
 
+    fn paused(&self) -> bool {
+        self.paused
+    }
+
     fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         self.ticks += 1;
         if input.restart {

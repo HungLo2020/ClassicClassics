@@ -13,7 +13,7 @@ const PANEL_X: f32 = 186.0;
 const PANEL_Y: f32 = 56.0;
 const PANEL_WIDTH: f32 = 588.0;
 const PANEL_HEIGHT: f32 = 446.0;
-const ROW_HEIGHT: f32 = 28.0;
+const ROW_HEIGHT: f32 = 25.0;
 const ROWS_TOP: f32 = 150.0;
 
 const WINDOW_PRESETS: [(u32, u32); 6] = [
@@ -32,6 +32,7 @@ enum Row {
     Window,
     Filtering,
     Scaling,
+    Crt,
     Volume,
     Mute,
     Controls,
@@ -47,6 +48,7 @@ fn rows(from_game: bool) -> Vec<Row> {
         Row::Window,
         Row::Filtering,
         Row::Scaling,
+        Row::Crt,
         Row::Volume,
         Row::Mute,
         Row::Controls,
@@ -165,6 +167,12 @@ impl SettingsScreen {
             Row::Scaling => {
                 if direction != 0 || input.confirm {
                     settings.integer = !settings.integer;
+                    changed = true;
+                }
+            }
+            Row::Crt => {
+                if direction != 0 || input.confirm {
+                    settings.crt = !settings.crt;
                     changed = true;
                 }
             }
@@ -304,6 +312,7 @@ impl SettingsScreen {
                     | Row::Window
                     | Row::Filtering
                     | Row::Scaling
+                    | Row::Crt
                     | Row::Volume
                     | Row::Mute
             ) {
@@ -332,14 +341,14 @@ impl SettingsScreen {
             let width = 110.0 * settings.volume;
             paint.rect(
                 PANEL_X + 300.0,
-                ROWS_TOP + 5.0 * ROW_HEIGHT + 3.0,
+                ROWS_TOP + 6.0 * ROW_HEIGHT + 3.0,
                 110.0,
                 5.0,
                 [22, 35, 47, 255],
             );
             paint.rect(
                 PANEL_X + 300.0,
-                ROWS_TOP + 5.0 * ROW_HEIGHT + 3.0,
+                ROWS_TOP + 6.0 * ROW_HEIGHT + 3.0,
                 width,
                 5.0,
                 GREEN,
@@ -382,6 +391,7 @@ impl Row {
             Self::Window => "RESOLUTION",
             Self::Filtering => "FILTERING",
             Self::Scaling => "SCALING",
+            Self::Crt => "CRT FILTER",
             Self::Volume => "MASTER VOLUME",
             Self::Mute => "MUTE",
             Self::Controls => "CONTROLS",
@@ -401,6 +411,7 @@ impl Row {
             }),
             Self::Filtering => Some(if settings.linear { "SMOOTH" } else { "SHARP" }.into()),
             Self::Scaling => Some(if settings.integer { "INTEGER" } else { "FIT" }.into()),
+            Self::Crt => Some(if settings.crt { "ON" } else { "OFF" }.into()),
             Self::Volume => Some(format!("{:03}%", (settings.volume * 100.0).round())),
             Self::Mute => Some(if settings.muted { "ON" } else { "OFF" }.into()),
             _ => None,
@@ -495,6 +506,8 @@ mod tests {
         assert!(settings.linear);
         activate(&mut screen, &mut settings, &mut sounds, Row::Scaling);
         assert!(settings.integer);
+        activate(&mut screen, &mut settings, &mut sounds, Row::Crt);
+        assert!(settings.crt);
         activate(&mut screen, &mut settings, &mut sounds, Row::Mute);
         assert!(settings.muted);
 

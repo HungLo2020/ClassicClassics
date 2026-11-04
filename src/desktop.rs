@@ -2,6 +2,10 @@
 //! the window, input snapshot and fixed-step clock; this module owns the
 //! collection session, audio, rendering and persistence.
 
+#[path = "crt.rs"]
+mod crt;
+use crt::CrtRenderer;
+
 use classicclassics_collection::audio::{Audio, SoundBank};
 use classicclassics_collection::cli::Options;
 use classicclassics_collection::controls::{self, Controls};
@@ -20,9 +24,7 @@ use quasar_input::{
     ActionState, Bindings, Button, GamepadAxis, GamepadButton, GamepadHub, InputState, Key,
     MouseButton, PlayerId,
 };
-use quasar_render_2d::{
-    Canvas, DynamicTexture, Image, PresentOutcome, Renderer2D, TextureId, Viewport,
-};
+use quasar_render_2d::{Canvas, DynamicTexture, Image, PresentOutcome, TextureId, Viewport};
 use quasar_storage::GamePaths;
 use quasar_window::{
     DesktopConfig, GameWindow, WindowConfig,
@@ -535,7 +537,7 @@ impl NativeProfile {
 }
 
 struct GpuSceneTarget<'a> {
-    renderer: &'a mut Renderer2D,
+    renderer: &'a mut CrtRenderer,
     assets: &'a mut SceneAssets,
     pixel: &'a mut Option<(DynamicTexture, Image)>,
 }
@@ -598,9 +600,21 @@ impl SceneTarget for GpuSceneTarget<'_> {
     }
 }
 
+/// Match game pointer positions to the CRT shader's barrel distortion.
+fn crt_pointer(point: (f64, f64), size: (u32, u32)) -> Option<[f32; 2]> {
+    let x = point.0 / f64::from(size.0) * 2.0 - 1.0;
+    let y = point.1 / f64::from(size.1) * 2.0 - 1.0;
+    let x = (x * (1.0 + 0.035 * y * y) + 1.0) * 0.5;
+    let y = (y * (1.0 + 0.035 * (point.0 / f64::from(size.0) * 2.0 - 1.0).powi(2)) + 1.0) * 0.5;
+    ((0.0..1.0).contains(&x) && (0.0..1.0).contains(&y)).then_some([
+        (x * f64::from(size.0)) as f32,
+        (y * f64::from(size.1)) as f32,
+    ])
+}
+
 struct App {
     // The presenter is explicitly dropped before the runner destroys the window.
-    presenter: Option<Renderer2D>,
+    presenter: Option<CrtRenderer>,
     assets: SceneAssets,
     pixel_texture: Option<(DynamicTexture, Image)>,
     profile: Option<NativeProfile>,
@@ -667,7 +681,7 @@ impl App {
         if let Some((texture, _)) = self.pixel_texture.take() {
             self.assets.textures.remove(texture.id());
         }
-        self.presenter = Some(Renderer2D::for_window(
+        self.presenter = Some(CrtRenderer::for_window(
             window.shared_native(),
             (size.width.max(1), size.height.max(1)),
             self.display_options(),
@@ -848,7 +862,13 @@ impl App {
                     self.presenter.as_ref().expect("presenter exists").options(),
                 )
                 .and_then(|view| cursor.and_then(|(x, y)| view.to_source(x, y)))
-                .map(|(x, y)| [x as f32, y as f32]);
+                .and_then(|point| {
+                    if self.session.crt_active() {
+                        crt_pointer(point, self.session.canvas_size())
+                    } else {
+                        Some([point.0 as f32, point.1 as f32])
+                    }
+                });
             }
         }
         // Recovery navigation keeps the shared settings accessible even after
@@ -903,11 +923,12 @@ impl App {
         let scene = self.scene()?;
         let scene_time = started.elapsed();
         let presenting = Instant::now();
-        let outcome = self
-            .presenter
-            .as_mut()
-            .expect("presenter exists")
-            .present(&scene, &self.assets.textures)?;
+        let crt = self.session.crt_active();
+        let outcome = self.presenter.as_mut().expect("presenter exists").present(
+            &scene,
+            &self.assets.textures,
+            crt,
+        )?;
         if outcome == PresentOutcome::Presented {
             if let Some(profile) = &mut self.profile {
                 profile.record(
@@ -1069,8 +1090,9 @@ impl App {
         };
         if self.presenter.is_some() {
             let scene = self.scene()?;
+            let crt = self.session.crt_active();
             let renderer = self.presenter.as_mut().expect("presenter exists");
-            let pixels = renderer.render_to_image(&scene, &self.assets.textures)?;
+            let pixels = renderer.render_to_image(&scene, &self.assets.textures, crt)?;
             quasar_render_2d::write_png(&path, scene.width(), scene.height(), &pixels)?;
         } else {
             let target = &mut self.assets;
@@ -1111,7 +1133,9 @@ impl App {
                 presenter.resize(0, 0);
                 let scene = self.scene()?;
                 let presenter = self.presenter.as_mut().expect("presenter exists");
-                if presenter.present(&scene, &self.assets.textures)? != PresentOutcome::Deferred {
+                if presenter.present(&scene, &self.assets.textures, false)?
+                    != PresentOutcome::Deferred
+                {
                     return Err("zero-size surface was not deferred".into());
                 }
                 presenter.resize(size.width, size.height);
@@ -1223,6 +1247,17 @@ impl DesktopApplication for App {
 mod tests {
     use super::*;
     use quasar_input::{GamepadAxis, Key};
+
+    #[test]
+    fn crt_pointer_maps_curved_screen_coordinates() {
+        assert_eq!(
+            crt_pointer((480.0, 300.0), (960, 600)),
+            Some([480.0, 300.0])
+        );
+        let [x, y] = crt_pointer((800.0, 480.0), (960, 600)).unwrap();
+        assert!(x > 800.0 && y > 480.0);
+        assert_eq!(crt_pointer((959.0, 599.0), (960, 600)), None);
+    }
 
     fn states() -> (InputState, InputState) {
         let bindings = Controls::default().bindings;

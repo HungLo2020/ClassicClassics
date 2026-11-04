@@ -11,6 +11,8 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+quasar-frame = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false }
+vulkanic-gal = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false }
 quasar-tilemap = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false, features = ["render-2d"] }
 classicclassics-assets = { path = "crates/classicclassics-assets" }
 quasar-assets = { git = "https://github.com/HungLo2020/Quasar", tag = "v0.2.20", default-features = false }
@@ -51,11 +53,13 @@ description = "A Quasar-powered collection of classic arcade games"
 
 [features]
 default = ["desktop", "gamepad", "audio"]
-desktop = ["dep:quasar-app", "quasar-app/desktop", "dep:quasar-window", "quasar-render-2d/gpu", "quasar-render-2d/native"]
+desktop = ["dep:quasar-frame", "dep:vulkanic-gal", "dep:quasar-app", "quasar-app/desktop", "dep:quasar-window", "quasar-render-2d/gpu", "quasar-render-2d/native"]
 gamepad = ["quasar-input/gilrs"]
 audio = ["classicclassics-collection/audio"]
 
 [dependencies]
+quasar-frame = { workspace = true, optional = true }
+vulkanic-gal = { workspace = true, optional = true }
 quasar-app = { workspace = true, optional = true }
 quasar-ui.workspace = true
 classicclassics-collection.workspace = true

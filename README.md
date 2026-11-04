@@ -75,6 +75,7 @@ the simulation and offers:
   the selected dimensions are used when windowed.
 - **Filtering** — Sharp (nearest) or Smooth (linear).
 - **Scaling** — Fit or Integer.
+- **CRT filter** — toggle a CRT-style shader for games; catalog and pause screens stay clear.
 - **Master volume** — adjust in 5% steps.
 - **Mute** — toggle output without losing the saved volume.
 - **Controls** — edit the global keyboard, mouse and gamepad action preset.
@@ -167,7 +168,7 @@ cargo run
 The native game uses Quasar's wgpu 30 renderer through Vulkan 1.3, including
 dynamic rendering, synchronization2 and timeline semaphores. `WGPU_BACKEND`
 selects a backend. Quasar's headless reference renderer and every simulation run
-without a GPU or window:
+without a GPU or window. Headless screenshots use the unfiltered reference renderer:
 
 ```sh
 cargo run --no-default-features -- --headless --ticks 2 \

@@ -15,6 +15,7 @@ pub struct Settings {
     pub auto_resolution: bool,
     pub linear: bool,
     pub integer: bool,
+    pub crt: bool,
     pub audio: bool,
     pub volume: f32,
     pub muted: bool,
@@ -30,6 +31,7 @@ impl Default for Settings {
             auto_resolution: true,
             linear: false,
             integer: false,
+            crt: false,
             audio: true,
             volume: 0.8,
             muted: false,
@@ -46,6 +48,7 @@ fn key(name: &str) -> Result<&'static str> {
         "auto_resolution" | "window.auto_resolution" => "auto_resolution",
         "linear" | "display.linear" => "linear",
         "integer" | "display.integer" => "integer",
+        "crt" | "display.crt" => "crt",
         "audio" | "audio.enabled" => "audio",
         "volume" | "audio.volume" => "volume",
         "muted" | "audio.muted" => "muted",
@@ -200,10 +203,12 @@ mod tests {
         let legacy = path.with_extension("json");
         let old = r#"{"version":1,"width":960,"height":600,"fullscreen":false,"volume":0.35}"#;
         std::fs::write(&legacy, old).unwrap();
-        let (settings, safe) = Settings::load(&path);
+        let (mut settings, safe) = Settings::load(&path);
         assert!(safe);
         assert_eq!((settings.width, settings.height), (960, 600));
         assert!(!settings.fullscreen && !settings.auto_resolution);
+        assert!(!settings.crt);
+        settings.crt = true;
         settings.save(&path).unwrap();
         assert_eq!(Settings::load(&path).0, settings);
         assert_eq!(std::fs::read_to_string(&legacy).unwrap(), old);

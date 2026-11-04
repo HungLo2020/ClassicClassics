@@ -56,6 +56,15 @@ impl Session {
         }
     }
 
+    /// The display effect applies only to active gameplay.
+    pub fn crt_active(&self) -> bool {
+        self.settings.crt
+            && self.loading.is_none()
+            && self.settings_screen.is_none()
+            && self.controls_screen.is_none()
+            && matches!(&self.screen, Screen::Game(game) if !game.paused())
+    }
+
     pub fn settings_open(&self) -> bool {
         self.settings_screen.is_some()
     }
@@ -598,6 +607,36 @@ mod tests {
     }
 
     #[test]
+    fn crt_is_confined_to_unpaused_games() {
+        let mut session = Session::new(
+            Records::default(),
+            Settings {
+                crt: true,
+                ..Settings::default()
+            },
+        );
+        assert!(!session.crt_active());
+        for kind in GameKind::ALL {
+            session.screen = Screen::Game(Game::new(kind));
+            assert!(session.crt_active(), "CRT should apply to {kind:?}");
+        }
+        session.launch(GameKind::LunarLander);
+        assert!(session.crt_active());
+        session.tick(Input {
+            pause: true,
+            ..Default::default()
+        });
+        assert!(!session.crt_active());
+        session.tick(Input {
+            pause: true,
+            ..Default::default()
+        });
+        assert!(session.crt_active());
+        session.open_settings();
+        assert!(!session.crt_active());
+    }
+
+    #[test]
     fn settings_can_leave_a_running_game() {
         let mut session = Session::new(Records::default(), Settings::default());
         session.launch(GameKind::Asteroids);
@@ -607,7 +646,7 @@ mod tests {
         });
         let rows = crate::settings_screen::SettingsScreen::new(true);
         let mut overlay = rows;
-        overlay.selection = 8;
+        overlay.selection = 9;
         session.settings_screen = Some(overlay);
         assert!(!session.tick(Input {
             confirm: true,

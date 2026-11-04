@@ -374,6 +374,10 @@ impl ArcadeGame for Game {
         accent: classicclassics_core::paint::CORAL,
     };
 
+    fn paused(&self) -> bool {
+        self.phase == Phase::Paused
+    }
+
     fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         self.ticks += 1;
         if input.restart {
