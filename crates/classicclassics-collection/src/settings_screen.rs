@@ -84,7 +84,7 @@ impl SettingsScreen {
 
     pub fn tick(
         &mut self,
-        input: Input,
+        mut input: Input,
         settings: &mut Settings,
         sounds: &mut Vec<Sound>,
     ) -> Outcome {
@@ -104,6 +104,22 @@ impl SettingsScreen {
             self.selection = (self.selection + 1) % rows.len();
             sounds.push(Sound::MenuMove);
         }
+        if (input.ui_click || input.ui_pointer_moved)
+            && let Some([x, y]) = input.ui_pointer
+            && (PANEL_X + 20.0..PANEL_X + PANEL_WIDTH - 20.0).contains(&x)
+        {
+            let index = ((y - (ROWS_TOP - 5.0)) / ROW_HEIGHT).floor() as isize;
+            if index >= 0 && (index as usize) < rows.len() {
+                self.selection = index as usize;
+                if input.ui_click && matches!(rows[self.selection], Row::Window | Row::Volume) {
+                    input.menu_left = x < PANEL_X + PANEL_WIDTH - 52.0;
+                    input.menu_right = !input.menu_left;
+                } else if input.ui_click {
+                    input.confirm = true;
+                }
+            }
+        }
+
         let direction = i8::from(input.menu_right) - i8::from(input.menu_left);
         let row = rows[self.selection];
         let mut changed = false;
@@ -410,6 +426,36 @@ fn gear(paint: &mut Paint, cx: f32, cy: f32, color: [u8; 4]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hover_selects_a_row_without_activating_it() {
+        let (mut screen, mut settings, mut sounds) = screen(false);
+        let fullscreen = settings.fullscreen;
+        assert_eq!(
+            screen.tick(
+                Input {
+                    ui_pointer: Some([300.0, ROWS_TOP + ROW_HEIGHT]),
+                    ui_pointer_moved: true,
+                    ..Default::default()
+                },
+                &mut settings,
+                &mut sounds
+            ),
+            Outcome::Stay
+        );
+        assert_eq!(screen.selection, 1);
+        assert_eq!(settings.fullscreen, fullscreen);
+        screen.tick(
+            Input {
+                ui_pointer: Some([300.0, ROWS_TOP + ROW_HEIGHT]),
+                menu_down: true,
+                ..Default::default()
+            },
+            &mut settings,
+            &mut sounds,
+        );
+        assert_eq!(screen.selection, 2);
+    }
 
     fn screen(from_game: bool) -> (SettingsScreen, Settings, Vec<Sound>) {
         (

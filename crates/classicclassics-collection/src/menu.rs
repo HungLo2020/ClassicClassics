@@ -58,6 +58,34 @@ pub fn navigate(selected: usize, input: crate::Input, count: usize) -> usize {
     selected
 }
 
+/// Resolve a click against the visible cards and page controls.
+pub fn click(selected: usize, count: usize, [x, y]: [f32; 2]) -> Option<(usize, bool)> {
+    let visible = page(selected, count);
+    if (100.0..160.0).contains(&y) && count > PAGE_SIZE {
+        if (1460.0..1620.0).contains(&x) {
+            return Some((
+                if visible.start == 0 {
+                    (count - 1) / PAGE_SIZE * PAGE_SIZE
+                } else {
+                    visible.start - PAGE_SIZE
+                },
+                false,
+            ));
+        }
+        if (1620.0..1840.0).contains(&x) {
+            return Some(((visible.start + PAGE_SIZE) % count, false));
+        }
+    }
+    for (slot, index) in visible.enumerate() {
+        let left = LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP);
+        let top = TOP + (slot / COLUMNS) as f32 * (CARD_HEIGHT + GAP);
+        if (left..left + CARD_WIDTH).contains(&x) && (top..top + CARD_HEIGHT).contains(&y) {
+            return Some((index, true));
+        }
+    }
+    None
+}
+
 pub fn scene(selected: usize, records: &Records, hints: &ControlHints) -> Canvas {
     catalog_scene(&GameKind::ALL, selected, records, hints, None)
 }
@@ -100,7 +128,7 @@ fn catalog_scene(
     let visible = page(selected, games.len());
     paint.right(
         1840.0,
-        116.0,
+        140.0,
         &format!(
             "PAGE {} / {}",
             visible.start / PAGE_SIZE + 1,
@@ -109,6 +137,10 @@ fn catalog_scene(
         2.0,
         DIM,
     );
+    if games.len() > PAGE_SIZE {
+        paint.text(1460.0, 116.0, "< PREV", 2.0, CYAN);
+        paint.text(1640.0, 116.0, "NEXT >", 2.0, CYAN);
+    }
     for (slot, index) in visible.enumerate() {
         let x = LEFT + (slot % COLUMNS) as f32 * (CARD_WIDTH + GAP);
         let y = TOP + (slot / COLUMNS) as f32 * (CARD_HEIGHT + GAP);
@@ -133,6 +165,7 @@ fn catalog_scene(
         2.0,
         MUTED,
     );
+    paint.text(1100.0, 1024.0, "SETTINGS", 2.0, CYAN);
     paint.right(
         1840.0,
         1024.0,
@@ -322,5 +355,21 @@ mod tests {
         assert_eq!(navigate(7, down, 8), 1);
         assert_eq!(navigate(0, down, 3), 1);
         assert_eq!(navigate(0, up, 3), 2);
+    }
+}
+
+#[cfg(test)]
+mod pointer_tests {
+    use super::*;
+
+    #[test]
+    fn clicks_select_visible_cards_and_switch_pages() {
+        assert_eq!(click(0, 8, [100.0, 200.0]), Some((0, true)));
+        assert_eq!(click(0, 8, [700.0, 200.0]), Some((1, true)));
+        assert_eq!(click(0, 8, [1700.0, 120.0]), Some((6, false)));
+        assert_eq!(click(6, 8, [100.0, 200.0]), Some((6, true)));
+        assert_eq!(click(0, 8, [1500.0, 120.0]), Some((6, false)));
+        assert_eq!(click(6, 8, [1500.0, 120.0]), Some((0, false)));
+        assert_eq!(click(6, 8, [1300.0, 200.0]), None);
     }
 }

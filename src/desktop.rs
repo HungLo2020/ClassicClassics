@@ -356,6 +356,9 @@ fn build_input(keyboard: &InputState, gamepad: &InputState, stick: &mut StickNav
         secondary_pressed: merged_action(keyboard, gamepad, controls::HYPERSPACE).pressed,
         other_players: [Default::default(); 3],
         pointer: None,
+        ui_pointer: None,
+        ui_click: false,
+        ui_pointer_moved: false,
         fire: fire.held(),
         fire_pressed: fire.pressed,
         hyperspace: merged_action(keyboard, gamepad, controls::HYPERSPACE).pressed,
@@ -816,6 +819,24 @@ impl App {
                 input.other_players[index] = state;
             }
             let cursor = self.keyboard.cursor_physical;
+            input.ui_pointer = Viewport::calculate(
+                self.session.canvas_size(),
+                self.size,
+                self.presenter.as_ref().expect("presenter exists").options(),
+            )
+            .and_then(|view| cursor.and_then(|(x, y)| view.to_source(x, y)))
+            .map(|(x, y)| [x as f32, y as f32]);
+            if self.session.settings_open()
+                && let Some([x, y]) = input.ui_pointer
+            {
+                let point = ControlsScreen::pointer_position(
+                    self.session.canvas_size(),
+                    (x as f64, y as f64),
+                );
+                input.ui_pointer = Some([point.x, point.y]);
+            }
+            input.ui_click = self.keyboard.mouse_pressed(MouseButton::Left);
+            input.ui_pointer_moved = cursor != self.last_game_pointer;
             if cursor != self.last_game_pointer {
                 self.last_game_pointer = cursor;
                 input.pointer = Viewport::calculate(

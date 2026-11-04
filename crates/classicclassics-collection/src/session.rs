@@ -161,7 +161,13 @@ impl Session {
                 }
             }
         }
-        if input.settings {
+        if input.settings
+            || (matches!(self.screen, Screen::Menu)
+                && input.ui_click
+                && input.ui_pointer.is_some_and(|[x, y]| {
+                    (1100.0..1450.0).contains(&x) && (1010.0..1060.0).contains(&y)
+                }))
+        {
             self.open_settings();
             self.sounds.push(Sound::MenuSelect);
             return false;
@@ -181,10 +187,20 @@ impl Session {
                 }
                 let previous = self.selected;
                 self.selected = menu::navigate(self.selected, input, GameKind::ALL.len());
+                let mut mouse_launch = false;
+                if (input.ui_click || input.ui_pointer_moved)
+                    && let Some(pointer) = input.ui_pointer
+                    && let Some((selected, launch)) =
+                        menu::click(self.selected, GameKind::ALL.len(), pointer)
+                    && (input.ui_click || launch)
+                {
+                    self.selected = selected;
+                    mouse_launch = input.ui_click && launch;
+                }
                 if previous != self.selected {
                     self.sounds.push(Sound::MenuMove);
                 }
-                if input.confirm {
+                if input.confirm || mouse_launch {
                     let kind = GameKind::ALL[self.selected];
                     self.launch(kind);
                 }
@@ -401,6 +417,29 @@ fn loading_scene(base: Canvas, kind: GameKind) -> Canvas {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hover_selects_cards_without_overriding_keyboard_or_switching_pages() {
+        let mut session = Session::new(Records::default(), Settings::default());
+        session.tick(Input {
+            ui_pointer: Some([700.0, 200.0]),
+            ui_pointer_moved: true,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 1);
+        session.tick(Input {
+            ui_pointer: Some([700.0, 200.0]),
+            menu_right: true,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 2);
+        session.tick(Input {
+            ui_pointer: Some([1700.0, 120.0]),
+            ui_pointer_moved: true,
+            ..Default::default()
+        });
+        assert_eq!(session.selected, 2);
+    }
 
     #[test]
     fn menu_navigation_launches_every_game_and_back_returns() {

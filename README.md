@@ -35,7 +35,7 @@ The game starts in borderless fullscreen on the detected monitor, with a
 `--resolution WxH` arguments take precedence.
 
 Choose a game with **A/D**, **W/S** or
-the arrow keys, then press **Enter**. **Escape** opens Settings from the catalog
+the arrow keys, then press **Enter**, or click a game card. Use **Prev** and **Next** to change pages with the mouse. **Escape** opens Settings from the catalog
 or freezes a running game. **Backspace** returns from a game to the catalog.
 **Q** always quits.
 
@@ -82,6 +82,8 @@ the simulation and offers:
 - **Back to catalog** — leave a running game and save its records.
 - **Restore defaults** — reset display and audio settings.
 - **Quit Classic Classics** — exit with status 0.
+
+Click settings rows to activate them; click the left or right side of Resolution and Master volume to adjust them.
 
 Changes apply immediately. Display and audio settings are written to
 `data/config/display.toml` on a normal exit. **F11/Alt+Enter**, **F2** and **F3**

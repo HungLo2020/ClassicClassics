@@ -23,6 +23,10 @@ pub struct Input {
     pub other_players: [PlayerControls; 3],
     /// Pointer position in the shared 960x600 logical game view, when moved.
     pub pointer: Option<[f32; 2]>,
+    /// Pointer in the current canvas and an independent primary mouse click.
+    pub ui_pointer: Option<[f32; 2]>,
+    pub ui_click: bool,
+    pub ui_pointer_moved: bool,
     pub fire: bool,
     pub fire_pressed: bool,
     pub hyperspace: bool,
