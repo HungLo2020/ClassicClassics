@@ -62,7 +62,7 @@ simulation thread. Playback never synchronously loads/decodes a missing clip.
 Music stops at the catalog and pauses with Settings or the game. Source loop
 regions are retained; Micro Mages' fade-out cue currently stops immediately.
 Standalone effect-priority rules use the collection's shared bus/voice limits.
-The other games' semantic sound events use generated effects. Fruit Slicer uses
+River Raid restores the standalone backup’s sound synthesizer, including its speed-dependent engine, through a Quasar procedural voice. It remains an approximation of the Atari TIA rather than cycle-exact emulation. The other games' semantic sound events use generated effects. Fruit Slicer uses
 its retained WAV slice/bomb/combo cues and looping dojo music through the same
 prepared-handle path; menu actions use its original click clip.
 

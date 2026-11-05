@@ -8,3 +8,6 @@ The original repository is unchanged. Desktop/device/persistence hosts are omitt
 `adapter.rs` connects the original simulation and pixels to the collection.
 Source changes are serialization derives, asset discovery, and host integration.
 Original regression fixtures and artwork are retained.
+
+The original `src/audio.rs` synthesizer was restored from the Git backup at the
+commit above; the ALSA host was omitted and Quasar owns playback.

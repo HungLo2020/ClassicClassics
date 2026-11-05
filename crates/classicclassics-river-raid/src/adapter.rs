@@ -23,6 +23,21 @@ pub struct Game {
     frame_cache: FrameCache,
     high_score: u64,
 }
+fn event_sound(event: crate::game::Event) -> Option<classicclassics_core::audio::RiverRaidSound> {
+    use crate::game::Event::*;
+    use classicclassics_core::audio::RiverRaidSound as Cue;
+    Some(match event {
+        Shot => Cue::Shot,
+        Explosion => Cue::Explosion,
+        Refuel => Cue::Refuel,
+        FullTank => Cue::FullTank,
+        ExtraLife => Cue::ExtraLife,
+        LowFuel => Cue::LowFuel,
+        GameOver => Cue::GameOver,
+        Bridge => return None,
+    })
+}
+
 impl ArcadeGame for Game {
     type Record = Record;
     const COVER: Option<&'static [u8]> = Some(include_bytes!("../assets/cover.png"));
@@ -38,6 +53,9 @@ impl ArcadeGame for Game {
     fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
         if input.restart {
             *self = Self::default();
+            sounds.push(Sound::RiverRaid(
+                classicclassics_core::audio::RiverRaidSound::Reset,
+            ));
             sounds.push(Sound::Asset(
                 classicclassics_core::audio::AssetSound::StopMusic,
             ));
@@ -46,6 +64,9 @@ impl ArcadeGame for Game {
             self.paused = !self.paused;
         }
         if self.paused {
+            sounds.push(Sound::RiverRaid(
+                classicclassics_core::audio::RiverRaidSound::Engine(None),
+            ));
             return;
         }
         let mut input = input;
@@ -57,7 +78,7 @@ impl ArcadeGame for Game {
         }
         let input = std::mem::take(&mut self.pending);
         self.frame_cache.invalidate();
-        for event in self.engine.tick(crate::game::Input {
+        let events = self.engine.tick(crate::game::Input {
             left: input.move_x < 0,
             right: input.move_x > 0,
             up: input.move_y < 0,
@@ -65,16 +86,15 @@ impl ArcadeGame for Game {
             fire: input.fire || input.fire_pressed,
             start: input.confirm,
             pause: false,
-        }) {
-            use crate::game::Event::*;
-            sounds.push(match event {
-                Shot => Sound::Laser,
-                Explosion | Bridge => Sound::Explosion,
-                ExtraLife => Sound::ExtraLife,
-                GameOver => Sound::GameOver,
-                LowFuel => Sound::Wall,
-                Refuel | FullTank => Sound::Score,
-            });
+        });
+        use classicclassics_core::audio::RiverRaidSound as Cue;
+        let speed =
+            matches!(self.engine.mode, crate::game::Mode::Playing).then_some(self.engine.speed);
+        sounds.push(Sound::RiverRaid(Cue::Engine(speed)));
+        for event in events {
+            if let Some(cue) = event_sound(event) {
+                sounds.push(Sound::RiverRaid(cue));
+            }
         }
     }
     fn autoplay(&self) -> Input {
@@ -168,5 +188,55 @@ impl ArcadeGame for Game {
             2.5,
             accent,
         );
+    }
+}
+
+#[cfg(test)]
+mod audio_tests {
+    use super::*;
+    use classicclassics_core::audio::RiverRaidSound as Cue;
+
+    #[test]
+    fn bridge_uses_the_single_explosion_and_other_events_keep_distinct_sounds() {
+        assert_eq!(event_sound(crate::game::Event::Bridge), None);
+        assert_eq!(
+            event_sound(crate::game::Event::Explosion),
+            Some(Cue::Explosion)
+        );
+        assert_eq!(event_sound(crate::game::Event::Refuel), Some(Cue::Refuel));
+        assert_eq!(
+            event_sound(crate::game::Event::FullTank),
+            Some(Cue::FullTank)
+        );
+        assert_eq!(event_sound(crate::game::Event::Shot), Some(Cue::Shot));
+    }
+
+    #[test]
+    fn engine_tracks_game_speed_and_stops_when_paused() {
+        let mut game = Game::default();
+        let mut sounds = Vec::new();
+        for _ in 0..4 {
+            game.tick(
+                Input {
+                    confirm: true,
+                    ..Default::default()
+                },
+                &mut sounds,
+            );
+        }
+        assert!(
+            sounds
+                .iter()
+                .any(|s| matches!(s, Sound::RiverRaid(Cue::Engine(Some(_)))))
+        );
+        sounds.clear();
+        game.tick(
+            Input {
+                pause: true,
+                ..Default::default()
+            },
+            &mut sounds,
+        );
+        assert!(sounds.contains(&Sound::RiverRaid(Cue::Engine(None))));
     }
 }

@@ -1,6 +1,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sound {
     Asset(AssetSound),
+    RiverRaid(RiverRaidSound),
     MenuMove,
     MenuSelect,
     Paddle,
@@ -37,4 +38,18 @@ pub enum MusicLoop {
     Whole,
     FromFrame(u64),
     Milliseconds(u64, u64),
+}
+
+/// Commands for the preserved River Raid synthesizer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RiverRaidSound {
+    Shot,
+    Explosion,
+    Refuel,
+    FullTank,
+    ExtraLife,
+    LowFuel,
+    GameOver,
+    Engine(Option<u8>),
+    Reset,
 }

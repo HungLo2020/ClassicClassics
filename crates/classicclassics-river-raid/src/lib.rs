@@ -2,6 +2,7 @@
 #[rustfmt::skip]
 #[allow(clippy::collapsible_if, clippy::manual_is_multiple_of, clippy::derivable_impls)]
 pub mod game;
+pub mod audio;
 #[rustfmt::skip]
 #[allow(clippy::collapsible_if, clippy::manual_is_multiple_of, clippy::derivable_impls)]
 pub mod render;

@@ -988,6 +988,7 @@ impl App {
         let paused = self.session.settings_open()
             || matches!(&self.session.screen, classicclassics_collection::session::Screen::Game(game) if game.paused());
         audio.pause_music(paused);
+        audio.pause_game_audio(paused);
         for sound in self.session.sounds.drain(..) {
             audio.play(sound, &self.bank, 0.0);
         }

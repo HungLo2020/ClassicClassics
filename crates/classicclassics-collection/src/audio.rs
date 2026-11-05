@@ -51,7 +51,7 @@ impl SoundBank {
 
     pub fn clip(&self, sound: Sound) -> &Clip {
         match sound {
-            Sound::Asset(_) | Sound::MenuMove => &self.menu_move,
+            Sound::Asset(_) | Sound::RiverRaid(_) | Sound::MenuMove => &self.menu_move,
             Sound::MenuSelect => &self.menu_select,
             Sound::Paddle => &self.paddle,
             Sound::Wall => &self.wall,
@@ -118,6 +118,207 @@ fn noise(seconds: f32, gain: f32, seed: u32) -> Clip {
     }
     Clip::from_samples(samples, 2, SAMPLE_RATE, "classicclassics-noise")
         .expect("generated noise is valid")
+}
+
+// River Raid's original synthesizer runs as a Quasar procedural voice. The
+// bounded command queue and fixed-capacity synth keep the audio callback free of
+// file access, blocking operations and unbounded allocation.
+#[cfg(feature = "audio")]
+mod river_raid {
+    use classicclassics_core::audio::RiverRaidSound as Cue;
+    use classicclassics_river_raid::audio::{Sound, Synth};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU32, Ordering},
+        mpsc::{self, Receiver, SyncSender},
+    };
+
+    struct Shared {
+        engine: AtomicU32,
+        muted: AtomicBool,
+        paused: AtomicBool,
+        running: AtomicBool,
+    }
+    pub struct Output {
+        sender: SyncSender<Cue>,
+        shared: Arc<Shared>,
+        pub handle: quasar_audio::VoiceHandle,
+    }
+    struct Source {
+        receiver: Receiver<Cue>,
+        shared: Arc<Shared>,
+        synth: Synth,
+        rate: u32,
+        command_countdown: u8,
+    }
+    impl quasar_audio::ProceduralSource for Source {
+        fn sample_rate(&self) -> u32 {
+            self.rate
+        }
+        fn channels(&self) -> u16 {
+            2
+        }
+        fn next_frame(&mut self, output: &mut [f32]) -> bool {
+            if !self.shared.running.load(Ordering::Relaxed) {
+                return false;
+            }
+            if self.command_countdown == 0 {
+                self.command_countdown = 127;
+                let silent = self.shared.muted.load(Ordering::Relaxed)
+                    || self.shared.paused.load(Ordering::Relaxed);
+                for cue in self.receiver.try_iter().take(64) {
+                    if cue == Cue::Reset {
+                        self.synth.clear();
+                        continue;
+                    }
+                    let sound = match cue {
+                        Cue::Shot => Some(Sound::Shot),
+                        Cue::Explosion => Some(Sound::Explosion),
+                        Cue::Refuel => Some(Sound::Refuel),
+                        Cue::FullTank => Some(Sound::FullTank),
+                        Cue::ExtraLife => Some(Sound::ExtraLife),
+                        Cue::LowFuel => Some(Sound::LowFuel),
+                        Cue::GameOver => Some(Sound::GameOver),
+                        Cue::Engine(_) | Cue::Reset => None,
+                    };
+                    if !silent && let Some(sound) = sound {
+                        self.synth.trigger(sound);
+                    }
+                }
+                if silent {
+                    self.synth.clear();
+                }
+                let engine = self.shared.engine.load(Ordering::Relaxed);
+                self.synth.set_engine(if silent || engine == 0 {
+                    None
+                } else {
+                    Some((engine - 1) as u8)
+                });
+            } else {
+                self.command_countdown -= 1;
+            }
+            let sample = self.synth.sample(self.rate as f32);
+            output.fill(sample);
+            true
+        }
+    }
+    impl Drop for Output {
+        fn drop(&mut self) {
+            self.shared.running.store(false, Ordering::Relaxed);
+        }
+    }
+    impl Output {
+        pub fn start(
+            engine: &quasar_audio::AudioEngine,
+            bus: quasar_audio::BusId,
+            muted: bool,
+        ) -> Result<Self, String> {
+            let (sender, receiver) = mpsc::sync_channel(64);
+            let shared = Arc::new(Shared {
+                engine: AtomicU32::new(0),
+                muted: AtomicBool::new(muted),
+                paused: AtomicBool::new(false),
+                running: AtomicBool::new(true),
+            });
+            let source = Source {
+                receiver,
+                shared: shared.clone(),
+                synth: Synth::default(),
+                rate: engine.diagnostics().sample_rate,
+                command_countdown: 0,
+            };
+            let handle = engine
+                .play(
+                    quasar_audio::SoundSource::Procedural(Box::new(source)),
+                    quasar_audio::PlaybackConfig {
+                        bus,
+                        ..Default::default()
+                    },
+                )
+                .map_err(|e| e.to_string())?;
+            Ok(Self {
+                sender,
+                shared,
+                handle,
+            })
+        }
+        pub fn send(&self, cue: Cue) {
+            match cue {
+                Cue::Engine(speed) => self.shared.engine.store(
+                    speed.map_or(0, |value| u32::from(value) + 1),
+                    Ordering::Relaxed,
+                ),
+                _ => {
+                    let _ = self.sender.try_send(cue);
+                }
+            }
+        }
+        pub fn pause(&self, paused: bool) {
+            self.shared.paused.store(paused, Ordering::Relaxed);
+        }
+        pub fn mute(&self, muted: bool) {
+            self.shared.muted.store(muted, Ordering::Relaxed);
+        }
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn quasar_procedural_voice_matches_restored_synth_and_pauses() {
+            let (sender, receiver) = mpsc::sync_channel(64);
+            let shared = Arc::new(Shared {
+                engine: AtomicU32::new(129),
+                muted: AtomicBool::new(false),
+                paused: AtomicBool::new(false),
+                running: AtomicBool::new(true),
+            });
+            let source = Source {
+                receiver,
+                shared: shared.clone(),
+                synth: Synth::default(),
+                rate: 48000,
+                command_countdown: 0,
+            };
+            let mut mixer =
+                quasar_audio::OfflineRenderer::new(quasar_audio::MixerConfig::default()).unwrap();
+            mixer
+                .mixer_mut()
+                .play(
+                    quasar_audio::SoundSource::Procedural(Box::new(source)),
+                    quasar_audio::PlaybackConfig::default(),
+                )
+                .unwrap();
+            sender.try_send(Cue::Shot).unwrap();
+            let samples = mixer.render(1000).unwrap();
+            let mut expected = Synth::default();
+            expected.set_engine(Some(128));
+            expected.trigger(Sound::Shot);
+            for frame in samples.chunks_exact(2) {
+                let value = expected.sample(48000.0);
+                assert!((frame[0] - value).abs() < 0.00001);
+                assert!((frame[1] - value).abs() < 0.00001);
+            }
+            shared.paused.store(true, Ordering::Relaxed);
+            let paused = mixer.render(256).unwrap();
+            assert!(paused[256..].iter().all(|sample| *sample == 0.0));
+            shared.paused.store(false, Ordering::Relaxed);
+            let resumed = mixer.render(256).unwrap();
+            assert!(resumed[256..].iter().any(|sample| sample.abs() > 0.01));
+            sender.try_send(Cue::Explosion).unwrap();
+            shared.engine.store(0, Ordering::Relaxed);
+            sender.try_send(Cue::Reset).unwrap();
+            let reset = mixer.render(256).unwrap();
+            assert!(reset[256..].iter().all(|sample| *sample == 0.0));
+            shared.running.store(false, Ordering::Relaxed);
+            assert!(
+                mixer
+                    .render(256)
+                    .unwrap()
+                    .iter()
+                    .all(|sample| *sample == 0.0)
+            );
+        }
+    }
 }
 
 #[cfg(feature = "audio")]
@@ -195,6 +396,7 @@ pub struct Audio {
     music_bus: quasar_audio::BusId,
     music: std::cell::RefCell<Option<(&'static str, &'static str, quasar_audio::VoiceHandle)>>,
     clips: SoundMap,
+    river_raid: Option<river_raid::Output>,
 }
 
 #[cfg(feature = "audio")]
@@ -228,6 +430,7 @@ impl Audio {
             music: Default::default(),
             // Decode before the host starts its clock; playback performs no file I/O.
             clips: SoundMap::new(),
+            river_raid: None,
         })
     }
 
@@ -239,7 +442,17 @@ impl Audio {
         assets: &mut crate::assets::GameAssets,
     ) -> Result<(), String> {
         self.play_asset(classicclassics_core::audio::AssetSound::StopMusic);
+        if let Some(output) = self.river_raid.take() {
+            let _ = self.engine.stop(&output.handle);
+        }
         self.clips.clear();
+        if kind == Some(crate::GameKind::RiverRaid) {
+            self.river_raid = Some(river_raid::Output::start(
+                &self.engine,
+                self.bus,
+                self.muted,
+            )?);
+        }
         if let Some(kind) = kind
             && let Some(root) = assets.game(kind)?
         {
@@ -249,6 +462,12 @@ impl Audio {
     }
 
     pub fn play(&self, sound: Sound, bank: &SoundBank, pan: f32) {
+        if let Sound::RiverRaid(cue) = sound {
+            if let Some(output) = &self.river_raid {
+                output.send(cue);
+            }
+            return;
+        }
         if let Sound::Asset(cue) = sound {
             self.play_asset(cue);
             return;
@@ -344,8 +563,17 @@ impl Audio {
         }
     }
 
+    pub fn pause_game_audio(&self, paused: bool) {
+        if let Some(output) = &self.river_raid {
+            output.pause(paused);
+        }
+    }
+
     pub fn set_muted(&mut self, muted: bool) {
         self.muted = muted;
+        if let Some(output) = &self.river_raid {
+            output.mute(muted);
+        }
         let _ = self.engine.set_bus_muted(self.music_bus, muted);
         let _ = self.engine.set_bus_muted(self.bus, muted);
     }
@@ -376,6 +604,7 @@ impl Audio {
     }
     pub fn play(&self, _: Sound, _: &SoundBank, _: f32) {}
     pub fn pause_music(&self, _: bool) {}
+    pub fn pause_game_audio(&self, _: bool) {}
     pub fn set_muted(&mut self, _: bool) {}
     pub fn muted(&self) -> bool {
         true
