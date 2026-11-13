@@ -19,6 +19,11 @@ pub struct Input {
     pub jump_pressed: bool,
     pub secondary: bool,
     pub secondary_pressed: bool,
+    /// Emulated systems' shoulder buttons.
+    pub shoulder_left: bool,
+    pub shoulder_right: bool,
+    /// Emulated systems' extra face button (SNES X).
+    pub aux: bool,
     /// Other local players (controller slots 2..4, keyboard player two).
     pub other_players: [PlayerControls; 3],
     /// Pointer position in the shared 960x600 logical game view, when moved.
@@ -50,6 +55,9 @@ pub struct PlayerControls {
     pub fire: bool,
     pub jump: bool,
     pub secondary: bool,
+    pub shoulder_left: bool,
+    pub shoulder_right: bool,
+    pub aux: bool,
 }
 impl Input {
     /// Preserve taps between original video frames while updating held inputs.
@@ -66,6 +74,9 @@ impl Input {
             current.fire |= previous.fire;
             current.jump |= previous.jump;
             current.secondary |= previous.secondary;
+            current.shoulder_left |= previous.shoulder_left;
+            current.shoulder_right |= previous.shoulder_right;
+            current.aux |= previous.aux;
         }
     }
 }

@@ -1,0 +1,82 @@
+{
+  "system": "gba",
+  "roms": [
+    {
+      "file": "Advance Wars 2 - Black Hole Rising (USA).gba",
+      "name": "Advance Wars 2 - Black Hole Rising (USA)",
+      "sha256": "ef3cc89273f9df88020f07751ea6306b25c39df01893822fe431550eedf9b134",
+      "size": 8388608,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Advance Wars Returns (v3.1).gba",
+      "name": "Advance Wars Returns (v3.1)",
+      "sha256": "320ad4bd5c4d14df7e4e24e290b8848c3099f6952846bd59a83e50c8e45d2726",
+      "size": 8388612,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Advance Wars.gba",
+      "name": "Advance Wars",
+      "sha256": "72f5ad9283aa709ee9c5f2cc277a281753a86cd73c920d93e7e0f656d1261cdb",
+      "size": 4194304,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Legend of Zelda, The - A Link to the Past & Four Swords (USA).gba",
+      "name": "Legend of Zelda, The - A Link to the Past & Four Swords (USA)",
+      "sha256": "f328f8f07d736288a00c80d31cc1630f3aa02aaf20efdcba73d31dae832b5d76",
+      "size": 8388608,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Legend of Zelda, The - The Minish Cap (USA).gba",
+      "name": "Legend of Zelda, The - The Minish Cap (USA)",
+      "sha256": "bedc74df62755f705398273de8ed3bc59be610cf55760d0b9aa277f1f5035e73",
+      "size": 16777216,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Metal Slug Advance (USA).gba",
+      "name": "Metal Slug Advance (USA)",
+      "sha256": "32e9771d05e6b88a246090c107d31371d226b9408ebd555b2a0277b703b1aa8c",
+      "size": 8388608,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Pokemon - FireRed Version (USA).gba",
+      "name": "Pokemon - FireRed Version (USA)",
+      "sha256": "3d0c79f1627022e18765766f6cb5ea067f6b5bf7dca115552189ad65a5c3a8ac",
+      "size": 16777216,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Pokemon - Ruby Version (USA).gba",
+      "name": "Pokemon - Ruby Version (USA)",
+      "sha256": "53d591215de2cab847d14fbcf8c516f0128cfa8556f1236065e0535aa5936d4e",
+      "size": 16777216,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Pokemon Emerald.gba",
+      "name": "Pokemon Emerald",
+      "sha256": "a9dec84dfe7f62ab2220bafaef7479da0929d066ece16a6885f6226db19085af",
+      "size": 16777216,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Pokemon Radical Red.gba",
+      "name": "Pokemon Radical Red",
+      "sha256": "41078f9b90b0240dd311c43acf042433d98f853ba1f37e8dfc5cc017536bcc41",
+      "size": 33554432,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Pokemon Shiny Gold Sigma.gba",
+      "name": "Pokemon Shiny Gold Sigma",
+      "sha256": "e120f618f9b2fa45040280043f59e6e49d5e0da1839a7020a9daf59c673ef335",
+      "size": 16777216,
+      "source": "user-supplied"
+    }
+  ]
+}

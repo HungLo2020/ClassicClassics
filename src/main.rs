@@ -7,7 +7,7 @@ mod desktop;
 use classicclassics_collection::cli::{self, Options};
 use classicclassics_collection::controls::Controls;
 use classicclassics_collection::settings::Settings;
-use classicclassics_collection::{Input, Records, Session, VERSION};
+use classicclassics_collection::{GameKind, Input, Records, Session, VERSION};
 use quasar_config::CommonArgs;
 use quasar_storage::GamePaths;
 use std::path::Path;
@@ -30,7 +30,19 @@ fn run() -> classicclassics_collection::Result {
         println!("classicclassics {VERSION}");
         return Ok(());
     }
-    let options = Options::from_common(&common)?;
+    let mut options = Options::from_common(&common)?;
+    if options.game.is_none()
+        && let Some(rom) = &options.rom
+    {
+        options.game = infer_system(rom);
+        if options.game.is_none() {
+            return Err(format!(
+                "cannot infer a system from '{}'; pass --game",
+                rom.display()
+            )
+            .into());
+        }
+    }
 
     if let Some(path) = &options.write_default_bindings {
         Controls::default().save(path)?;
@@ -80,6 +92,19 @@ fn run() -> classicclassics_collection::Result {
     };
     let mut session = Session::new(records, settings);
     session.controls = controls;
+    session.set_emulator_paths(paths.app.clone(), paths.save.clone());
+    session.set_saving(!options.no_save);
+    session.set_extra_rom_dirs(options.rom_dirs.clone());
+    if let Some(cores) = &options.core_dir {
+        session.set_emulator_cores(cores.clone());
+    }
+    if let Some(rom) = &options.rom {
+        session.set_initial_rom(rom.clone());
+    }
+    session.refresh_catalog();
+    if let Some(index) = options.catalog_index {
+        session.select_catalog(index);
+    }
     let defer_desktop_launch = !options.headless
         && options.ticks.is_none()
         && options.screenshot.is_none()
@@ -122,6 +147,15 @@ fn run() -> classicclassics_collection::Result {
     }
 }
 
+fn infer_system(path: &Path) -> Option<GameKind> {
+    let extension = path.extension()?.to_str()?;
+    GameKind::ALL.into_iter().find(|kind| {
+        kind.rom_extensions()
+            .iter()
+            .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+    })
+}
+
 fn run_headless(options: &Options, session: &mut Session) -> classicclassics_collection::Result {
     if let Some(error) = &session.asset_error {
         return Err(error.clone().into());
@@ -135,6 +169,7 @@ fn run_headless(options: &Options, session: &mut Session) -> classicclassics_col
         };
         session.tick(input);
     }
+    session.save_runtime();
     if let Some(path) = &options.screenshot {
         if let Some(parent) = path
             .parent()

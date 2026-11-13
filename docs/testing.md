@@ -7,9 +7,11 @@ cargo test --locked --no-default-features
 ```
 
 This build excludes the window, GPU, gamepad and native audio backends. It runs
-the menu, all eight simulations, vector/pixel draw-list validation, reference
-rasterisation, controls validation, CLI parsing and generated-audio tests. The
-suite covers:
+the menu, all native simulations, the four emulated systems, vector/pixel
+draw-list validation, reference rasterisation, controls validation, CLI parsing
+and generated-audio tests. Emulator tests use a synthetic NES fixture and the
+PCM resampler; the libretro cores are exercised by the headless cartridge sweep
+below. The suite covers:
 
 - imported upstream simulation, rendering, campaign and replay regression suites;
 - adapter/original state equivalence for movement, multiplayer, grenades and batteries;
@@ -55,8 +57,29 @@ cargo run --locked --no-default-features -- \
 ```
 
 Additional game aliases are `micromages`, `jackal`, `missile-command`,
-`river-raid` and `fruitslicer`. Use 6000 ticks to exercise setup and actual
-gameplay during autoplay.
+`river-raid`, `fruitslicer`, `nes`, `snes`, `gba` and `atari2600`. Use 6000
+ticks to exercise setup and actual gameplay during autoplay.
+
+Every built-in cartridge is a smoke fixture. The sweep checks that the core
+accepts each image and that the first frames render:
+
+```sh
+cargo build --locked --no-default-features
+DevUtils/smoke_emulators.sh
+```
+
+Emulator `--state` records the picker and selected cartridge identity; machine
+state is written separately as the binary `.state` file under
+`data/save/emulators/`.
+
+The catalog now has one card per native game and built-in cartridge. Use
+`--catalog-index N` to select a card for screenshots, for example index 8 is the
+first NES title:
+
+```sh
+cargo run --locked --no-default-features -- --headless --ticks 1 \
+  --catalog-index 8 --screenshot /tmp/catalog-nes.png
+```
 
 The catalog screenshot is 1920×1080. Most game screenshots remain 960×600;
 Fruit Slicer presents its native 1280×720 canvas without letterboxing.

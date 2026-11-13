@@ -10,6 +10,92 @@ use quasar_audio::Clip;
 
 pub const SAMPLE_RATE: u32 = 48_000;
 
+#[derive(Default)]
+struct SinkState {
+    queue: std::collections::VecDeque<[f32; 2]>,
+    input_rate: u32,
+    phase: f64,
+    last: [f32; 2],
+}
+
+#[derive(Clone, Default)]
+pub struct EmulatorSink(std::sync::Arc<std::sync::Mutex<SinkState>>);
+
+impl EmulatorSink {
+    pub fn push(&self, audio: &classicclassics_core::EmulatorAudio) {
+        let Ok(mut state) = self.0.lock() else {
+            return;
+        };
+        let rate = audio.sample_rate.max(1);
+        if state.input_rate != rate {
+            state.input_rate = rate;
+            state.phase = 0.0;
+        }
+        let channels = audio.channels.max(1) as usize;
+        for frame in audio.samples.chunks(channels) {
+            let left = frame.first().copied().unwrap_or(0.0);
+            let right = frame.get(1).copied().unwrap_or(left);
+            state.queue.push_back([left, right]);
+        }
+        let limit = SAMPLE_RATE as usize / 2;
+        while state.queue.len() > limit {
+            state.queue.pop_front();
+        }
+    }
+
+    pub fn clear(&self) {
+        if let Ok(mut state) = self.0.lock() {
+            state.queue.clear();
+            state.phase = 0.0;
+            state.last = [0.0; 2];
+        }
+    }
+}
+
+impl quasar_audio::ProceduralSource for EmulatorSink {
+    fn sample_rate(&self) -> u32 {
+        SAMPLE_RATE
+    }
+    fn channels(&self) -> u16 {
+        2
+    }
+    fn next_frame(&mut self, output: &mut [f32]) -> bool {
+        let Ok(mut state) = self.0.lock() else {
+            return true;
+        };
+        if state.queue.len() >= 2 {
+            let a = state.queue[0];
+            let b = state.queue[1];
+            let fraction = state.phase as f32;
+            let frame = [
+                a[0] + (b[0] - a[0]) * fraction,
+                a[1] + (b[1] - a[1]) * fraction,
+            ];
+            state.last = frame;
+            let step = f64::from(state.input_rate.max(1)) / f64::from(SAMPLE_RATE);
+            state.phase += step;
+            while state.phase >= 1.0 && !state.queue.is_empty() {
+                state.queue.pop_front();
+                state.phase -= 1.0;
+            }
+            if let Some(first) = output.first_mut() {
+                *first = frame[0];
+            }
+            if let Some(second) = output.get_mut(1) {
+                *second = frame[1];
+            }
+        } else {
+            if let Some(first) = output.first_mut() {
+                *first = state.last[0];
+            }
+            if let Some(second) = output.get_mut(1) {
+                *second = state.last[1];
+            }
+        }
+        true
+    }
+}
+
 pub use classicclassics_core::Sound;
 
 pub struct SoundBank {
@@ -397,6 +483,8 @@ pub struct Audio {
     music: std::cell::RefCell<Option<(&'static str, &'static str, quasar_audio::VoiceHandle)>>,
     clips: SoundMap,
     river_raid: Option<river_raid::Output>,
+    emulator_sink: Option<EmulatorSink>,
+    emulator_voice: Option<quasar_audio::VoiceHandle>,
 }
 
 #[cfg(feature = "audio")]
@@ -431,6 +519,8 @@ impl Audio {
             // Decode before the host starts its clock; playback performs no file I/O.
             clips: SoundMap::new(),
             river_raid: None,
+            emulator_sink: None,
+            emulator_voice: None,
         })
     }
 
@@ -442,8 +532,12 @@ impl Audio {
         assets: &mut crate::assets::GameAssets,
     ) -> Result<(), String> {
         self.play_asset(classicclassics_core::audio::AssetSound::StopMusic);
+        self.stop_emulator();
         if let Some(output) = self.river_raid.take() {
             let _ = self.engine.stop(&output.handle);
+        }
+        if kind.is_some_and(|kind| kind.emulator_system().is_some()) {
+            self.start_emulator();
         }
         self.clips.clear();
         if kind == Some(crate::GameKind::RiverRaid) {
@@ -459,6 +553,43 @@ impl Audio {
             self.clips = load_imported_sounds(&root, kind)?;
         }
         Ok(())
+    }
+
+    fn start_emulator(&mut self) {
+        let sink = EmulatorSink::default();
+        let config = quasar_audio::PlaybackConfig {
+            bus: self.bus,
+            volume: 0.7,
+            ..Default::default()
+        };
+        match self.engine.play(
+            quasar_audio::SoundSource::Procedural(Box::new(sink.clone())),
+            config,
+        ) {
+            Ok(handle) => {
+                self.emulator_sink = Some(sink);
+                self.emulator_voice = Some(handle);
+            }
+            Err(error) => eprintln!("Cannot start emulator audio ({error}); continuing silently"),
+        }
+    }
+
+    fn stop_emulator(&mut self) {
+        if let Some(handle) = self.emulator_voice.take() {
+            let _ = self.engine.stop(&handle);
+        }
+        if let Some(sink) = self.emulator_sink.take() {
+            sink.clear();
+        }
+    }
+
+    pub fn play_emulator(&self, audio: classicclassics_core::EmulatorAudio) {
+        if self.muted {
+            return;
+        }
+        if let Some(sink) = &self.emulator_sink {
+            sink.push(&audio);
+        }
     }
 
     pub fn play(&self, sound: Sound, bank: &SoundBank, pan: f32) {
@@ -567,6 +698,12 @@ impl Audio {
         if let Some(output) = &self.river_raid {
             output.pause(paused);
         }
+        if let Some(handle) = &self.emulator_voice {
+            let _ = self.engine.set_voice_paused(handle, paused);
+        }
+        if paused && let Some(sink) = &self.emulator_sink {
+            sink.clear();
+        }
     }
 
     pub fn set_muted(&mut self, muted: bool) {
@@ -603,6 +740,7 @@ impl Audio {
         Ok(())
     }
     pub fn play(&self, _: Sound, _: &SoundBank, _: f32) {}
+    pub fn play_emulator(&self, _: classicclassics_core::EmulatorAudio) {}
     pub fn pause_music(&self, _: bool) {}
     pub fn pause_game_audio(&self, _: bool) {}
     pub fn set_muted(&mut self, _: bool) {}
@@ -610,6 +748,92 @@ impl Audio {
         true
     }
     pub fn set_volume(&self, _: f32) {}
+}
+
+#[cfg(test)]
+mod sink_tests {
+    use super::{EmulatorSink, SAMPLE_RATE};
+    use classicclassics_core::EmulatorAudio;
+    use quasar_audio::ProceduralSource;
+
+    fn render(sink: &mut EmulatorSink, frames: usize) -> Vec<f32> {
+        let mut output = Vec::with_capacity(frames * 2);
+        for _ in 0..frames {
+            let mut frame = [0.0; 2];
+            assert!(sink.next_frame(&mut frame));
+            output.extend_from_slice(&frame);
+        }
+        output
+    }
+
+    #[test]
+    fn same_rate_stereo_passes_through_and_underruns_hold_last() {
+        let sink = EmulatorSink::default();
+        let samples: Vec<f32> = (0..480)
+            .flat_map(|i| [i as f32 / 1000.0, -(i as f32) / 1000.0])
+            .collect();
+        sink.push(&EmulatorAudio {
+            sample_rate: SAMPLE_RATE,
+            channels: 2,
+            samples,
+        });
+        let mut source = sink.clone();
+        let output = render(&mut source, 480);
+        assert!((output[0] - 0.0).abs() < 1e-6);
+        assert!((output[2] - 0.001).abs() < 1e-6);
+        let held = render(&mut source, 1);
+        assert!(held[0].is_finite());
+    }
+
+    #[test]
+    fn mono_and_resampled_input_remains_audible() {
+        let sink = EmulatorSink::default();
+        sink.push(&EmulatorAudio {
+            sample_rate: 24_000,
+            channels: 1,
+            samples: vec![0.5; 240],
+        });
+        let mut source = sink.clone();
+        let output = render(&mut source, 480);
+        assert!(output.iter().any(|sample| sample.abs() > 0.01));
+        assert!(output.iter().all(|sample| sample.is_finite()));
+    }
+
+    #[test]
+    fn mixer_plays_the_emulator_sink_as_a_procedural_voice() {
+        let sink = EmulatorSink::default();
+        sink.push(&EmulatorAudio {
+            sample_rate: SAMPLE_RATE,
+            channels: 2,
+            samples: (0..960).map(|i| ((i as f32) * 0.05).sin() * 0.5).collect(),
+        });
+        let mut renderer =
+            quasar_audio::OfflineRenderer::new(quasar_audio::MixerConfig::default()).unwrap();
+        renderer
+            .mixer_mut()
+            .play(
+                quasar_audio::SoundSource::Procedural(Box::new(sink.clone())),
+                quasar_audio::PlaybackConfig::default(),
+            )
+            .unwrap();
+        let samples = renderer.render(480).unwrap();
+        assert!(samples.iter().any(|sample| sample.abs() > 0.01));
+        assert!(samples.iter().all(|sample| sample.is_finite()));
+    }
+
+    #[test]
+    fn clear_discards_queued_audio() {
+        let sink = EmulatorSink::default();
+        sink.push(&EmulatorAudio {
+            sample_rate: SAMPLE_RATE,
+            channels: 2,
+            samples: vec![1.0; 480],
+        });
+        sink.clear();
+        let mut source = sink.clone();
+        let output = render(&mut source, 4);
+        assert!(output.iter().all(|sample| *sample == 0.0));
+    }
 }
 
 #[cfg(test)]

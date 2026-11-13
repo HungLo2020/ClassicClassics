@@ -10,7 +10,8 @@ and marked for this project. Any deviation is called out explicitly.
       `.basalt/`.
 - [x] The game never writes to `app/` at runtime.
 - [x] Progress and user content are stored in `data/save/`
-      (`$BASALT_SAVE_DIR`).
+      (`$BASALT_SAVE_DIR`). Emulator battery files and states live under
+      `data/save/emulators/`; optional user cartridges live under `data/roms/`.
 - [x] Machine-specific settings are in `data/config/` (`$BASALT_CONFIG_DIR`);
       portable settings are in `data/config/shared/`
       (`$BASALT_SHARED_CONFIG_DIR`).
@@ -36,10 +37,11 @@ and marked for this project. Any deviation is called out explicitly.
 
 - [x] Explicit releases replace one rolling `Latest` tag/release, separate from
       normal commit/push CI. Assets have predictable platform-tagged names: `ClassicClassics-<version>-linux-x64.zip`.
-- [x] The release bundles the executable, cover, icon and runtime notes. It
-      relies only on a standard Linux desktop: glibc, a Vulkan 1.3 driver, and
-      the desktop's X11/Wayland and audio stack. There is no Electron/JRE/Python
-      runtime dependency.
+- [x] The release bundles the executable, cover, icon, runtime notes, the pinned
+      emulator cores in `app/cores/` and the built-in cartridge library. It
+      relies only on a standard Linux desktop: glibc/libstdc++, a Vulkan 1.3
+      driver, and the desktop's X11/Wayland and audio stack. There is no
+      Electron/JRE/Python runtime dependency.
 - [x] There is no built-in updater.
 - [x] The game starts without arguments, terminal input or network access.
 - [x] The game exits 0 on a normal quit, non-zero on a fatal error.
@@ -48,6 +50,9 @@ and marked for this project. Any deviation is called out explicitly.
 
 - [x] `app/basalt/cover.png` is a 900×1200 (3:4) opaque PNG under 2 MB.
 - [x] `app/basalt/icon.png` is a 512×512 PNG with transparency.
+- [x] Every built-in cartridge has a normalized 3:4 catalog cover under
+      `app/games/<system>/covers/`; user-supplied cartridges fall back to the
+      system motif.
 - [x] The catalog entry's `artwork.cover_url` points at the same cover in this
       repository.
 

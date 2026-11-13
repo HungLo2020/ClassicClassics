@@ -34,6 +34,38 @@ impl GameAssets {
         self.mounted.insert(name);
         Ok(())
     }
+    /// Built-in catalogue covers are stored beside the cartridge tree as
+    /// `covers/<fnv-id>.png`. Dynamic user cartridges have no artwork.
+    pub fn rom_covers(&self, kind: GameKind) -> Vec<(u64, std::path::PathBuf)> {
+        let Some(system) = kind.emulator_system() else {
+            return Vec::new();
+        };
+        let Some(manifest) = kind.asset_manifest_dir() else {
+            return Vec::new();
+        };
+        let base = classicclassics_assets::game_root(system, manifest);
+        let mut covers = Vec::new();
+        for root in [base.join("covers"), base.join(system).join("covers")] {
+            let Ok(entries) = std::fs::read_dir(root) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("png") {
+                    continue;
+                }
+                let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                    continue;
+                };
+                let Ok(id) = u64::from_str_radix(stem, 16) else {
+                    continue;
+                };
+                covers.push((id, path));
+            }
+        }
+        covers
+    }
+
     pub fn catalog(&mut self) -> Result<Directory> {
         if !self.catalog {
             let mut source = MemorySource::new("embedded catalog artwork");

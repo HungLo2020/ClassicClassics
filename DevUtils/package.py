@@ -18,11 +18,18 @@ Requires a Vulkan 1.3 desktop driver and a standard Linux desktop session
 (X11 or Wayland). Bundles no runtime beyond the executable; libc and the
 graphics/audio stack come from the host system.
 
+Emulated systems use the included libretro cores in app/cores and the built-in
+cartridges in app/games/<system>/roms. Additional cartridges may be placed under
+data/roms/ (or passed with --rom-dir); emulator battery and state files live
+under data/save/emulators/.
+
 Save, configuration and cache files are created under the Basalt install root:
   data/save/           records and progress
+  data/save/emulators/ battery-backed cartridge saves and states
   data/config/         display and audio settings
   data/config/shared/  portable controls preset
   data/cache/          reserved for rebuildable files
+  data/roms/           optional user-supplied cartridges
 """
 
 
@@ -36,6 +43,15 @@ def version() -> str:
     return next(package["version"] for package in metadata["packages"] if package["name"] == "classicclassics")
 
 
+EMULATORS = {
+    "nes": "nes",
+    "snes": "snes",
+    "gba": "gba",
+    "atari2600": "atari2600",
+}
+CORES = ("snes9x_libretro.so", "mgba_libretro.so", "stella2023_libretro.so")
+
+
 def game_assets():
     """Source assets mapped into the release-owned app tree."""
     for game in ("micromages", "jackal", "fruitslicer"):
@@ -43,6 +59,24 @@ def game_assets():
         for path in sorted(root.rglob("*")):
             if path.is_file():
                 yield path, f"app/games/{game}/{path.relative_to(root).as_posix()}"
+    for system, alias in EMULATORS.items():
+        root = ROOT / "crates" / "classicclassics-emulators" / "assets" / system
+        for path in sorted(root.rglob("*")):
+            if path.is_file():
+                yield path, f"app/games/{alias}/{path.relative_to(root).as_posix()}"
+
+
+def core_assets():
+    """Dynamic cores and notices are release-owned and must always be present."""
+    root = ROOT / "app" / "cores"
+    missing = [name for name in CORES if not (root / name).is_file()]
+    if missing:
+        raise SystemExit(
+            "missing emulator cores (run DevUtils/build_cores.py): " + ", ".join(missing)
+        )
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            yield path, f"app/cores/{path.relative_to(root).as_posix()}"
 
 
 def main() -> None:
@@ -69,6 +103,7 @@ def main() -> None:
     package_version = version()
     args.output.mkdir(parents=True, exist_ok=True)
     archive = args.output / f"ClassicClassics-{package_version}-{system}-{machine}.zip"
+    cores = list(core_assets())
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
         executable = zipfile.ZipInfo(f"app/bin/classicclassics{suffix}")
         executable.create_system = 3
@@ -79,6 +114,8 @@ def main() -> None:
         output.write(ROOT / "app/basalt/icon.png", "app/basalt/icon.png")
         output.write(ROOT / "LICENSE", "app/LICENSE")
         for path, destination in game_assets():
+            output.write(path, destination)
+        for path, destination in cores:
             output.write(path, destination)
         output.writestr(
             "app/CLASSICCLASSICS-RUNTIME.txt",

@@ -25,6 +25,9 @@ pub const P2_FIRE: &str = "p2_fire";
 pub const P2_JUMP: &str = "p2_jump";
 pub const P2_SECONDARY: &str = "p2_secondary";
 pub const FIRE: &str = "fire";
+pub const SHOULDER_LEFT: &str = "shoulder_left";
+pub const SHOULDER_RIGHT: &str = "shoulder_right";
+pub const AUX: &str = "aux";
 pub const HYPERSPACE: &str = "hyperspace";
 pub const PAUSE: &str = "pause";
 pub const RESTART: &str = "restart";
@@ -38,7 +41,7 @@ pub const SCALE: &str = "scale";
 pub const MENU_HORIZONTAL: &str = "menu_horizontal";
 pub const MENU_VERTICAL: &str = "menu_vertical";
 
-pub const ACTIONS: [&str; 30] = [
+pub const ACTIONS: [&str; 33] = [
     MENU_UP,
     MENU_DOWN,
     MENU_LEFT,
@@ -52,6 +55,9 @@ pub const ACTIONS: [&str; 30] = [
     THRUST,
     FIRE,
     JUMP,
+    SHOULDER_LEFT,
+    SHOULDER_RIGHT,
+    AUX,
     MOVE_HORIZONTAL,
     MOVE_VERTICAL,
     P2_HORIZONTAL,
@@ -116,6 +122,18 @@ impl Default for Controls {
                 },
             )
             .bind(JUMP, Binding::gamepad_button(GamepadButton::North))
+            .bind(SHOULDER_LEFT, Binding::key(Key::KeyC))
+            .bind(
+                SHOULDER_LEFT,
+                Binding::gamepad_button(GamepadButton::LeftBumper),
+            )
+            .bind(SHOULDER_RIGHT, Binding::key(Key::KeyV))
+            .bind(
+                SHOULDER_RIGHT,
+                Binding::gamepad_button(GamepadButton::RightBumper),
+            )
+            .bind(AUX, Binding::key(Key::KeyX))
+            .bind(AUX, Binding::gamepad_button(GamepadButton::C))
             .bind(
                 P2_HORIZONTAL,
                 Binding::axis(Key::ArrowLeft, Key::ArrowRight),
@@ -177,7 +195,7 @@ impl Default for Controls {
             .bind(PAUSE, Binding::key(Key::KeyP))
             .bind(PAUSE, Binding::gamepad_button(GamepadButton::Start))
             .bind(RESTART, Binding::key(Key::KeyR))
-            .bind(RESTART, Binding::gamepad_button(GamepadButton::LeftBumper))
+            .bind(RESTART, Binding::gamepad_button(GamepadButton::RightStick))
             .bind(MODE, Binding::key(Key::Tab))
             .bind(MODE, Binding::gamepad_button(GamepadButton::North))
             .bind(MUTE, Binding::key(Key::KeyM))
@@ -269,6 +287,9 @@ impl Controls {
             MOVE_HORIZONTAL,
             MOVE_VERTICAL,
             JUMP,
+            SHOULDER_LEFT,
+            SHOULDER_RIGHT,
+            AUX,
             P2_HORIZONTAL,
             P2_FIRE,
             P2_JUMP,
@@ -279,6 +300,16 @@ impl Controls {
                 .actions
                 .entry(name.into())
                 .or_insert_with(|| defaults.bindings.actions[name].clone());
+        }
+        // Shipped presets before emulator shoulders used LB for Restart. Move
+        // that one default so LB can be the emulator L shoulder.
+        if let Some(values) = controls.bindings.actions.get_mut(RESTART) {
+            let old = Binding::gamepad_button(GamepadButton::LeftBumper);
+            let new = Binding::gamepad_button(GamepadButton::RightStick);
+            if values.contains(&old) && !values.contains(&new) {
+                values.retain(|value| *value != old);
+                values.push(new);
+            }
         }
         controls.validate()?;
         Ok(controls)
@@ -369,6 +400,9 @@ impl Controls {
             thrust: label(THRUST),
             fire: label(FIRE),
             jump: label(JUMP),
+            shoulder_left: label(SHOULDER_LEFT),
+            shoulder_right: label(SHOULDER_RIGHT),
+            aux: label(AUX),
             hyperspace: label(HYPERSPACE),
             pause: label(PAUSE),
             restart: label(RESTART),

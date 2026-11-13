@@ -1,0 +1,40 @@
+{
+  "system": "snes",
+  "roms": [
+    {
+      "file": "Contra III - The Alien Wars (USA).sfc",
+      "name": "Contra III - The Alien Wars (USA)",
+      "sha256": "a93ea87fc835c530b5135c5294433d15eef6dbf656144b387e89ac19cf864996",
+      "size": 1048576,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Earthbound (U).smc",
+      "name": "Earthbound (U)",
+      "sha256": "d3d73ee3fb5ab9f69f4b0c852323c53d65ab9ee1efb7b4180aa045063f888503",
+      "size": 3146240,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Super Ghouls 'N Ghosts (USA).sfc",
+      "name": "Super Ghouls 'N Ghosts (USA)",
+      "sha256": "7468c271d7240cf4e0d08c16e9969a1b1b1caf5adc0e5adc568d93c92651a057",
+      "size": 1048576,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Super Mario Kart (U) [!].smc",
+      "name": "Super Mario Kart (U) [!]",
+      "sha256": "6495d32e95774b1ce4ca2e3ba78270fb39322f967e29d6c1589055f115e8ab0e",
+      "size": 524800,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Terminator 2 - Judgment Day (U).smc",
+      "name": "Terminator 2 - Judgment Day (U)",
+      "sha256": "06db3be569a587d79b51bfc684fd2ebdea977863875aedec88218fbb4169c21b",
+      "size": 1048576,
+      "source": "user-supplied"
+    }
+  ]
+}

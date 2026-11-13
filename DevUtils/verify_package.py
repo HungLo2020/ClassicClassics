@@ -36,11 +36,24 @@ def verify(archive: Path, version: str) -> list[str]:
             "app/basalt/icon.png",
             "app/CLASSICCLASSICS-RUNTIME.txt",
         }
-        # Both sprite games need their complete exported asset trees at runtime.
+        # Imported games and emulated systems need their complete asset trees.
         for game in ("micromages", "jackal", "fruitslicer"):
             root = ROOT / "crates" / f"classicclassics-{game}" / "assets"
             required.update(f"app/games/{game}/{path.relative_to(root).as_posix()}"
                             for path in root.rglob("*") if path.is_file())
+        for system in ("nes", "snes", "gba", "atari2600"):
+            root = ROOT / "crates" / "classicclassics-emulators" / "assets" / system
+            required.update(f"app/games/{system}/{path.relative_to(root).as_posix()}"
+                            for path in root.rglob("*") if path.is_file())
+        core_root = ROOT / "app" / "cores"
+        required.update(f"app/cores/{path.relative_to(core_root).as_posix()}"
+                        for path in core_root.rglob("*") if path.is_file())
+        for core in ("snes9x_libretro.so", "mgba_libretro.so", "stella2023_libretro.so"):
+            name = f"app/cores/{core}"
+            if name not in names:
+                errors.append(f"missing emulator core: {name}")
+            elif bundle.getinfo(name).file_size < 100_000:
+                errors.append(f"emulator core is implausibly small: {name}")
         missing = sorted(required - set(names))
         if missing:
             errors.append(f"missing release files: {', '.join(missing)}")

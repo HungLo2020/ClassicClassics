@@ -107,6 +107,7 @@ impl ArcadeGame for Game {
             fire: input.fire || input.fire_pressed,
             jump: input.jump || input.jump_pressed || (!in_game && input.confirm),
             secondary: input.secondary || input.secondary_pressed,
+            ..Default::default()
         };
         let players = [
             primary,

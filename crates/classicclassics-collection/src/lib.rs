@@ -1,6 +1,7 @@
 //! Collection orchestration shared by the native and headless hosts.
 pub mod assets;
 pub mod audio;
+pub mod catalog;
 pub mod cli;
 mod config_file;
 pub mod controls;
@@ -9,6 +10,7 @@ pub mod games;
 pub mod menu;
 mod records;
 pub mod rendering;
+pub mod roms;
 pub mod session;
 pub mod settings;
 pub mod settings_screen;

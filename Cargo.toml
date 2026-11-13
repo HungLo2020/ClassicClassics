@@ -41,6 +41,11 @@ classicclassics-jackal = { path = "crates/classicclassics-jackal" }
 classicclassics-missile-command = { path = "crates/classicclassics-missile-command" }
 classicclassics-river-raid = { path = "crates/classicclassics-river-raid" }
 classicclassics-fruitslicer = { path = "crates/classicclassics-fruitslicer" }
+classicclassics-emulators = { path = "crates/classicclassics-emulators" }
+classicclassics-nes = { path = "crates/classicclassics-nes" }
+classicclassics-snes = { path = "crates/classicclassics-snes" }
+classicclassics-gba = { path = "crates/classicclassics-gba" }
+classicclassics-atari2600 = { path = "crates/classicclassics-atari2600" }
 
 [package]
 name = "classicclassics"
@@ -94,6 +99,10 @@ opt-level = 1
 opt-level = 1
 [profile.dev.package.classicclassics-core]
 opt-level = 1
+[profile.dev.package.classicclassics-emulators]
+opt-level = 2
+[profile.dev.package.tetanes-core]
+opt-level = 2
 [profile.dev.package.classicclassics-assets]
 opt-level = 2
 [profile.dev.package.quasar-assets]

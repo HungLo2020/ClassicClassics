@@ -1,0 +1,159 @@
+{
+  "system": "nes",
+  "roms": [
+    {
+      "file": "Battletoads (USA).nes",
+      "name": "Battletoads (USA)",
+      "sha256": "677330f45a1249d24d003792a4674c93f836be57fd18b57125306efe82f3cda8",
+      "size": 262160,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Bubble Bobble (USA).nes",
+      "name": "Bubble Bobble (USA)",
+      "sha256": "fc521e891d074369d67579fd56617460b9c9949dec67cc4a37d46b4e4bb09d29",
+      "size": 163856,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Castlevania II - Simon's Quest (USA).nes",
+      "name": "Castlevania II - Simon's Quest (USA)",
+      "sha256": "f045d72683d3156555eccbb56090888f03a15e5b25e59db49dca7a87330472d3",
+      "size": 262160,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Contra (U).nes",
+      "name": "Contra (U)",
+      "sha256": "26541a5550ee22deeb3d5484e4a96130219b58cff74d068fb1eb6567fa5e5519",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Duck Hunt (World).nes",
+      "name": "Duck Hunt (World)",
+      "sha256": "ca0d31e6f3aa70204fa5af67803c6533851a28fa48a133e15d772d3667fa675a",
+      "size": 24592,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Ghosts'n Goblins (U).nes",
+      "name": "Ghosts'n Goblins (U)",
+      "sha256": "78d805d00ce005c50212180c715dc95578d2700fbf5b76e9e83ad951726f6354",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Jackal (U).nes",
+      "name": "Jackal (U)",
+      "sha256": "98ed6d10391cccef249ce45cd935eb6263163f727fbf2fc11adb8116aa49f31d",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Kirby's Adventure (USA).nes",
+      "name": "Kirby's Adventure (USA)",
+      "sha256": "b0d74f4270ad5855f10224c460956f6dfe41d6673a38262ad0d37aa9ce103dd5",
+      "size": 786448,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Legend of Zelda, The.nes",
+      "name": "Legend of Zelda, The",
+      "sha256": "89232edf4f9b52e3cb872094bc78973de080befca2ddea893b6e936066514d4e",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Lifeforce (U).nes",
+      "name": "Lifeforce (U)",
+      "sha256": "a606c6c4c6d81b72ee783c5ad9b91cb8e1d09206c4ad2ba881698fa15fa3af57",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Mega Man (USA).nes",
+      "name": "Mega Man (USA)",
+      "sha256": "58fb9ef0c14c2947332929b9330d56c38a78040fd388274c39efd84e8d5446c7",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Mega Man 2 (USA).nes",
+      "name": "Mega Man 2 (USA)",
+      "sha256": "49136b412ff61beac6e40d0bbcd8691a39a50cd2744fdcdde3401eed53d71edf",
+      "size": 262160,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Mega Man 3 (USA).nes",
+      "name": "Mega Man 3 (USA)",
+      "sha256": "eddbe571cf0a201ba9d090fbace9843c9c9dd4053051649f2575b088752f4675",
+      "size": 393232,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Metroid (U).nes",
+      "name": "Metroid (U)",
+      "sha256": "c5eea06e1e1128b576bd789f1a4f63bb154d6d31579c2f319382fb77a72d34a6",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Micro Mages.nes",
+      "name": "Micro Mages",
+      "sha256": "a4b5b736a84b260314c18783381fe2dca7b803f7c29e78fb403a0f9087a7e570",
+      "size": 40976,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Rad Racer (USA).nes",
+      "name": "Rad Racer (USA)",
+      "sha256": "2a871d3205d176c810d57f8b3eab65842f53f73c296c57d010fd591a3a25ab58",
+      "size": 131088,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Star Wars (U).nes",
+      "name": "Star Wars (U)",
+      "sha256": "bbef22965c6dfd4b6d297eb98fdb6f435859a44a81dd5fbc9f2846ef87d9dd37",
+      "size": 262160,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Super C (USA).nes",
+      "name": "Super C (USA)",
+      "sha256": "9d2f1935c8afdb9eea1c4d983aa750680c99564cbd35978205c34433a46dafaf",
+      "size": 262160,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Super Mario Bros 3 (U) (PRG 1) [h2].nes",
+      "name": "Super Mario Bros 3 (U) (PRG 1) [h2]",
+      "sha256": "0282b262d0beff347dc10e464b30db514207346713963f15d5654770430cbfee",
+      "size": 393232,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Super Mario Bros.nes",
+      "name": "Super Mario Bros",
+      "sha256": "ec299b990e8bfee8ba46e3f61d63b2e1ae5b8a2e431de84e2e4bbd692dc53586",
+      "size": 40976,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Tetris (U) [!].nes",
+      "name": "Tetris (U) [!]",
+      "sha256": "fdb764dce8175c15f5198648b119905ef2caf0a5c51fae329ebf1be9e3c035d4",
+      "size": 49168,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Zelda II - The Adventure of Link (USA).nes",
+      "name": "Zelda II - The Adventure of Link (USA)",
+      "sha256": "ad8c0fbcf092bf84b48e69fd3964eea4ed91bfe62abc352943d537979782680c",
+      "size": 262160,
+      "source": "user-supplied"
+    }
+  ]
+}

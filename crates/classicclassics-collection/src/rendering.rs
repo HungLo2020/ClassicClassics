@@ -7,10 +7,22 @@ use quasar_render_2d::{Image, TextureId, Textures};
 use std::collections::BTreeMap;
 
 #[derive(Default)]
-pub struct CatalogArt(BTreeMap<&'static str, TextureId>);
+pub struct CatalogArt {
+    native: BTreeMap<&'static str, TextureId>,
+    rom: BTreeMap<u64, TextureId>,
+}
 impl CatalogArt {
     pub fn get(&self, kind: GameKind) -> Option<TextureId> {
-        self.0.get(kind.number()).copied()
+        self.native.get(kind.number()).copied()
+    }
+    pub fn get_rom(&self, id: u64) -> Option<TextureId> {
+        self.rom.get(&id).copied()
+    }
+    pub fn get_entry(&self, entry: &crate::catalog::CatalogEntry) -> Option<TextureId> {
+        entry
+            .artwork_kind()
+            .and_then(|kind| self.get(kind))
+            .or_else(|| entry.rom().and_then(|rom| self.get_rom(rom.id)))
     }
 }
 
@@ -53,7 +65,17 @@ impl SceneAssets {
             if kind.cover().is_some() {
                 let image = catalog.join(format!("{}.png", kind.number())).image()?;
                 let id = assets.textures.insert(image);
-                assets.artwork.0.insert(kind.number(), id);
+                assets.artwork.native.insert(kind.number(), id);
+            }
+            for (rom, path) in resources.rom_covers(kind) {
+                let Ok(bytes) = std::fs::read(&path) else {
+                    continue;
+                };
+                let Ok(image) = Image::decode_png(bytes.as_slice()) else {
+                    continue;
+                };
+                let id = assets.textures.insert(image);
+                assets.artwork.rom.insert(rom, id);
             }
         }
         Ok(assets)

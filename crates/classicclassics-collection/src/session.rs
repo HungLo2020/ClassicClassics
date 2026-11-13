@@ -1,13 +1,17 @@
 //! Menu, game selection, records and the shared simulation input.
 
 use crate::audio::Sound;
+use crate::catalog::CatalogEntry;
 use crate::controls::Controls;
 use crate::controls_screen::{CaptureEvent, ControlsScreen};
 use crate::menu;
+use crate::roms;
 use crate::settings::Settings;
 use crate::settings_screen::{self, SettingsScreen};
+use classicclassics_core::{EmulatorAudio, GameLoadContext};
 use quasar_render_2d::Canvas;
 use serde::Serialize;
+use std::path::PathBuf;
 
 pub use crate::games::{Game, GameKind, Records};
 pub use classicclassics_core::Input;
@@ -30,10 +34,14 @@ pub struct Session {
     catalog_scroll: f32,
     catalog_scroll_target: f32,
     pub records: Records,
+    pub catalog: Vec<CatalogEntry>,
     pub settings: Settings,
     pub sounds: Vec<Sound>,
     /// A desktop launch waiting for its first visible loading frame.
     pub loading: Option<GameKind>,
+    pub emulator: roms::EmulatorPaths,
+    save_enabled: bool,
+    cached_roms: Option<(GameKind, Vec<classicclassics_core::RomEntry>)>,
 }
 
 impl Session {
@@ -50,10 +58,81 @@ impl Session {
             catalog_scroll: 0.0,
             catalog_scroll_target: 0.0,
             records,
+            catalog: crate::catalog::build(Vec::new()),
             settings,
             sounds: Vec::new(),
             loading: None,
+            emulator: roms::EmulatorPaths::default(),
+            save_enabled: true,
+            cached_roms: None,
         }
+    }
+
+    pub fn set_saving(&mut self, enabled: bool) {
+        self.save_enabled = enabled;
+    }
+
+    pub fn set_emulator_paths(&mut self, app: PathBuf, save: PathBuf) {
+        self.emulator.app = app;
+        self.emulator.save = save;
+    }
+
+    pub fn set_emulator_cores(&mut self, cores: PathBuf) {
+        self.emulator.cores = Some(cores);
+    }
+
+    pub fn set_initial_rom(&mut self, path: PathBuf) {
+        self.emulator.initial = Some(path);
+    }
+
+    pub fn set_extra_rom_dirs(&mut self, dirs: Vec<PathBuf>) {
+        self.emulator.extra = dirs;
+    }
+
+    /// Rebuild the visible card list as native games followed by every
+    /// discovered cartridge. Safe to call again after changing ROM paths.
+    pub fn refresh_catalog(&mut self) {
+        let previous = self.catalog.get(self.selected).cloned();
+        let mut groups = Vec::new();
+        for kind in GameKind::ALL {
+            if kind.is_emulator() {
+                groups.push((kind, self.roms_for(kind)));
+            }
+        }
+        self.catalog = crate::catalog::build(groups);
+        if let Some(previous) = previous
+            && let Some(index) = self.catalog.iter().position(|entry| entry.same(&previous))
+        {
+            self.selected = index;
+        }
+        self.selected = self.selected.min(self.catalog.len().saturating_sub(1));
+        self.catalog_scroll_target = menu::scroll_offset(self.selected);
+    }
+
+    fn roms_for(&mut self, kind: GameKind) -> Vec<classicclassics_core::RomEntry> {
+        let mut roms = if let Some((cached_kind, roms)) = &self.cached_roms
+            && *cached_kind == kind
+        {
+            roms.clone()
+        } else {
+            roms::discover(kind, &self.emulator)
+        };
+        if let Some(path) = &self.emulator.initial
+            && !roms.iter().any(|rom| &rom.path == path)
+            && path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    kind.rom_extensions()
+                        .iter()
+                        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+                })
+            && let Some(entry) = roms::entry_for(kind, path.as_path())
+        {
+            roms.push(entry);
+        }
+        self.cached_roms = Some((kind, roms.clone()));
+        roms
     }
 
     /// The display effect applies only to active gameplay.
@@ -93,17 +172,97 @@ impl Session {
         }
     }
 
+    pub fn select_catalog(&mut self, index: usize) {
+        if self.catalog.is_empty() {
+            return;
+        }
+        self.selected = index.min(self.catalog.len() - 1);
+        self.catalog_scroll_target = menu::scroll_offset(self.selected);
+        self.catalog_scroll = self.catalog_scroll_target;
+    }
+
+    pub fn launch_selected(&mut self) {
+        let Some(entry) = self.catalog.get(self.selected).cloned() else {
+            return;
+        };
+        let kind = entry.kind();
+        match entry {
+            CatalogEntry::Game(kind) => {
+                self.emulator.initial = None;
+                self.launch(kind);
+            }
+            CatalogEntry::Rom { rom, .. } => {
+                self.emulator.initial = Some(rom.path.clone());
+                self.launch(kind);
+            }
+        }
+    }
+
+    pub fn save_runtime(&mut self) {
+        if let Screen::Game(game) = &mut self.screen {
+            game.save();
+        }
+    }
+
     pub fn launch(&mut self, kind: GameKind) {
+        self.save_runtime();
         self.loading = None;
-        self.selected = GameKind::ALL
+        if let Some(path) = &self.emulator.initial
+            && let Some(index) = self
+                .catalog
+                .iter()
+                .position(|entry| entry.rom().is_some_and(|rom| &rom.path == path))
+        {
+            self.selected = index;
+        } else if let Some(index) = self
+            .catalog
             .iter()
-            .position(|candidate| *candidate == kind)
-            .unwrap_or(0);
+            .position(|entry| matches!(entry, CatalogEntry::Game(entry) if *entry == kind))
+        {
+            self.selected = index;
+        }
         self.asset_error = None;
-        let result = self
-            .assets
-            .game(kind)
-            .and_then(|root| Game::load(kind, root.as_ref()));
+        let emulated = kind.emulator_system().is_some();
+        let roms = if emulated {
+            self.roms_for(kind)
+        } else {
+            Vec::new()
+        };
+        let initial_rom = if emulated {
+            self.emulator
+                .initial
+                .as_ref()
+                .and_then(|path| roms.iter().find(|rom| &rom.path == path).cloned())
+        } else {
+            None
+        };
+        let save_dir = if emulated && !self.emulator.save.as_os_str().is_empty() {
+            Some(self.emulator.save.join("emulators"))
+        } else {
+            None
+        };
+        let core_dir = if emulated {
+            self.emulator.cores.clone().or_else(|| {
+                (!self.emulator.app.as_os_str().is_empty()).then(|| self.emulator.app.join("cores"))
+            })
+        } else {
+            None
+        };
+        let result = match self.assets.game(kind) {
+            Ok(assets) => {
+                let ctx = GameLoadContext {
+                    assets,
+                    roms,
+                    initial_rom,
+                    save_dir,
+                    core_dir,
+                    save_enabled: self.save_enabled,
+                };
+                Game::load_with(kind, &ctx)
+            }
+            Err(error) => Err(error),
+        };
+        self.emulator.initial = None;
         match result {
             Ok(game) => self.screen = Screen::Game(game),
             Err(error) => self.asset_failure(format!("{}: {error}", kind.name())),
@@ -146,6 +305,7 @@ impl Session {
             self.settings.muted = !self.settings.muted;
         }
         if input.quit {
+            self.save_runtime();
             return true;
         }
         if let Some(screen) = &mut self.settings_screen {
@@ -159,6 +319,7 @@ impl Session {
                 settings_screen::Outcome::LeaveToCatalog => {
                     if let Screen::Game(game) = &mut self.screen {
                         game.record(&mut self.records);
+                        game.save();
                     }
                     self.screen = Screen::Menu;
                     let _ = self.assets.store.clear_cache();
@@ -169,7 +330,10 @@ impl Session {
                     self.sounds.push(Sound::MenuSelect);
                     return false;
                 }
-                settings_screen::Outcome::Quit => return true,
+                settings_screen::Outcome::Quit => {
+                    self.save_runtime();
+                    return true;
+                }
                 settings_screen::Outcome::Controls => {
                     self.controls_screen = Some(ControlsScreen::new(&self.controls));
                     return false;
@@ -201,12 +365,12 @@ impl Session {
                     return true;
                 }
                 let previous = self.selected;
-                self.selected = menu::navigate(self.selected, input, GameKind::ALL.len());
+                let count = self.catalog.len();
+                self.selected = menu::navigate(self.selected, input, count);
                 self.wheel_remainder = (self.wheel_remainder + input.ui_scroll).clamp(-10.0, 10.0);
                 while self.wheel_remainder.abs() >= 1.0 {
                     let down = self.wheel_remainder < 0.0;
-                    self.selected =
-                        menu::scroll_selection(self.selected, GameKind::ALL.len(), down);
+                    self.selected = menu::scroll_selection(self.selected, count, down);
                     self.wheel_remainder += if down { 1.0 } else { -1.0 };
                 }
                 if self.selected != previous {
@@ -222,7 +386,7 @@ impl Session {
                 if (input.ui_click || (input.ui_pointer_moved && input.ui_scroll == 0.0))
                     && let Some(pointer) = input.ui_pointer
                     && let Some((selected, launch)) =
-                        menu::click(self.catalog_scroll, GameKind::ALL.len(), pointer)
+                        menu::click(self.catalog_scroll, self.catalog.len(), pointer)
                     && (input.ui_click || launch)
                 {
                     self.selected = selected;
@@ -232,14 +396,18 @@ impl Session {
                     self.sounds.push(Sound::MenuMove);
                 }
                 if input.confirm || mouse_launch {
-                    let kind = GameKind::ALL[self.selected];
-                    self.launch(kind);
+                    self.launch_selected();
                 }
                 false
             }
             Screen::Game(game) => {
                 if input.back {
+                    if game.back_to_picker() {
+                        game.record(&mut self.records);
+                        return false;
+                    }
                     game.record(&mut self.records);
+                    game.save();
                     self.screen = Screen::Menu;
                     let _ = self.assets.store.clear_cache();
                     self.sounds.push(Sound::Asset(
@@ -275,7 +443,13 @@ impl Session {
     pub fn scene(&mut self) -> Canvas {
         let hints = self.controls.hints();
         let base = match &self.screen {
-            Screen::Menu => menu::scene(self.selected, self.catalog_scroll, &self.records, &hints),
+            Screen::Menu => menu::scene(
+                &self.catalog,
+                self.selected,
+                self.catalog_scroll,
+                &self.records,
+                &hints,
+            ),
             Screen::Game(game) => game.scene(&hints),
         };
         self.overlay(base)
@@ -290,6 +464,7 @@ impl Session {
             Screen::Menu => {
                 target.clear_draw_frame();
                 menu::scene_with_art(
+                    &self.catalog,
                     self.selected,
                     self.catalog_scroll,
                     &self.records,
@@ -358,6 +533,13 @@ impl Session {
         match &self.settings_screen {
             Some(screen) => screen.scene(&self.settings, &hints, base),
             None => base,
+        }
+    }
+
+    pub fn take_audio(&mut self) -> Option<EmulatorAudio> {
+        match &mut self.screen {
+            Screen::Game(game) => game.take_audio(),
+            Screen::Menu => None,
         }
     }
 
@@ -554,10 +736,11 @@ mod tests {
     #[test]
     fn menu_navigation_launches_every_game_and_back_returns() {
         let mut session = Session::new(Records::default(), Settings::default());
-        for expected in GameKind::ALL {
-            let index = GameKind::ALL
+        for expected in GameKind::ALL.into_iter().filter(|kind| !kind.is_emulator()) {
+            let index = session
+                .catalog
                 .iter()
-                .position(|kind| *kind == expected)
+                .position(|entry| matches!(entry, CatalogEntry::Game(kind) if *kind == expected))
                 .unwrap();
             session.selected = index;
             assert!(!session.tick(Input {
@@ -657,13 +840,36 @@ mod tests {
     }
 
     #[test]
+    fn catalog_launches_a_cartridge_and_back_returns_to_picker_then_catalog() {
+        let mut session = Session::new(Records::default(), Settings::default());
+        session.refresh_catalog();
+        assert!(session.catalog.len() > 12);
+        let index = session
+            .catalog
+            .iter()
+            .position(|entry| {
+                entry.kind() == GameKind::Nes && entry.rom().is_some_and(|rom| rom.builtin)
+            })
+            .expect("a built-in NES cartridge");
+        session.selected = index;
+        session.launch_selected();
+        assert!(matches!(session.screen, Screen::Game(_)));
+        assert!(session.summary().contains("running=true"));
+        assert!(!session.tick(Input {
+            back: true,
+            ..Default::default()
+        }));
+        assert!(matches!(session.screen, Screen::Menu));
+    }
+
+    #[test]
     fn edge_navigation_and_quit_are_deterministic() {
         let mut session = Session::new(Records::default(), Settings::default());
         assert!(!session.tick(Input {
             menu_left: true,
             ..Default::default()
         }));
-        assert_eq!(session.selected, GameKind::ALL.len() - 1);
+        assert_eq!(session.selected, session.catalog.len() - 1);
         assert!(!session.tick(Input {
             menu_right: true,
             ..Default::default()

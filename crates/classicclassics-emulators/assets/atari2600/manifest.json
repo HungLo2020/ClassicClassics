@@ -1,0 +1,61 @@
+{
+  "system": "atari2600",
+  "roms": [
+    {
+      "file": "Adventure.A26",
+      "name": "Adventure",
+      "sha256": "64cd3bf23a617fc7c14e3b2075297ae045c712c6218c42564ae77dab672e2826",
+      "size": 4096,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Asteroids.A26",
+      "name": "Asteroids",
+      "sha256": "d1a6e808412b4535c7e54fc25414943a9418b1095b4d4969dc33290f7eaa72a4",
+      "size": 8192,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Missile Command (USA).a26",
+      "name": "Missile Command (USA)",
+      "sha256": "46c444b91854e3652cc00facf52101d3c9fa3528eaba7674cc790acc3ad59086",
+      "size": 4096,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Ms. Pac-Man.A26",
+      "name": "Ms. Pac-Man",
+      "sha256": "6d894764bf473d0a3ee9bca6b023457a2dfe894f210e5c5938c866f7b4ed75cb",
+      "size": 8192,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Pitfall 2 - the Lost Caverns.A26",
+      "name": "Pitfall 2 - the Lost Caverns",
+      "sha256": "332d8fbac1dc3e98eeb1d7549c37890a758bd588545de3ea6d842e3103b516f3",
+      "size": 10496,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Pitfall!.a26",
+      "name": "Pitfall!",
+      "sha256": "c56c99d9e00136a015a485851e0e925c6327ea2b20aa7d3daecfbd7f9afcfdf0",
+      "size": 4096,
+      "source": "user-supplied"
+    },
+    {
+      "file": "River Raid.A26",
+      "name": "River Raid",
+      "sha256": "63f2d9d184f802228d45f14759d25e42ba0604b2119d90baf155a16bf4ab2e92",
+      "size": 4096,
+      "source": "user-supplied"
+    },
+    {
+      "file": "Super Breakout.A26",
+      "name": "Super Breakout",
+      "sha256": "06495eba11710bc3ed1d8509a7e21cf01f9bc00be5cffff4d9f100e108f8602a",
+      "size": 4096,
+      "source": "user-supplied"
+    }
+  ]
+}

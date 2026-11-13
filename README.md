@@ -3,8 +3,10 @@
 A single-window arcade collection built almost entirely from
 [Quasar](https://github.com/HungLo2020/Quasar) infrastructure: Pong, Lunar
 Lander, Asteroids, Micro Mages, Jackal, Missile Command, River Raid and Fruit
-Slicer, with vector, original pixel and native-resolution sprite rendering,
-shared controls, persistent high scores and a Basalt-ready Linux release.
+Slicer, plus NES, Super Nintendo, Game Boy Advance and Atari 2600 cartridge
+systems. It combines vector, original pixel and native-resolution sprite
+rendering with emulator framebuffers, shared controls, persistent high scores,
+cartridge saves and a Basalt-ready Linux release.
 
 ![Classic Classics cover](app/basalt/cover.png)
 
@@ -24,6 +26,15 @@ and the [Basalt Game Standard](https://github.com/HungLo2020/Basalt/blob/main/ST
 | **Missile Command** | Arcade defense | Aim and fire three batteries to protect six cities. |
 | **River Raid** | Scrolling shooter | Navigate the river, destroy targets and manage fuel. |
 | **Fruit Slicer** | Slicing arcade | Swipe fruit, chain combos and avoid bombs across Classic, Arcade and Zen runs. |
+| **NES** | Emulation | Built-in and user cartridges through the TetaNES core; 1–2 players. |
+| **Super Nintendo** | Emulation | Built-in and user cartridges through Snes9x; 1–2 players. |
+| **Game Boy Advance** | Emulation | Built-in and user cartridges through mGBA. |
+| **Atari 2600** | Emulation | Built-in and user cartridges through Stella 2023; 1–2 players. |
+
+Every cartridge gets its own catalog card rather than sharing a system submenu.
+Emulated cards carry an **NES**, **SNES**, **GBA** or **ATARI 2600** badge, and
+built-in cartridges have box art. Dynamically discovered user cartridges use the
+system motif until artwork is supplied.
 
 The catalog screen is the entry point. It uses a 1920×1080 logical canvas with
 a vertically scrolling three-column grid. Two complete rows and a preview of
@@ -51,18 +62,65 @@ or freezes a running game. **Backspace** returns from a game to the catalog.
 | Imported primary fire | Left mouse | South / RT |
 | Jump / right missile battery | Space or middle mouse | North |
 | Grenade / left missile battery | Shift or right mouse | West |
+| Emulator L / R | C / V | LB / RB |
+| Emulator X | X | C |
+| Emulated system face buttons | Left mouse / Space / Shift / Tab | A / B / X / Y, Start, Select |
 | Imported player two | Arrows; Numpad 0 fire, 1 jump, 2 grenade | Second controller |
 | Rotate ship / lander | A/D or Left/Right | Left stick |
 | Thrust | W or Up | Triggers |
 | Hyperspace | Shift | West |
 | Pong mode | Tab | North |
 | Pause | P | Start |
-| Restart | R | LB |
+| Restart | R | Right stick click |
 | Mute | M | — |
 | Fullscreen | F11 or Alt+Enter | — |
 | Filter / scaling | F2 / F3 | — |
 
 See [Imported games](docs/imported-games.md) for setup screens, multiplayer and per-game controls.
+
+### Emulated systems
+
+NES, Super Nintendo, Game Boy Advance and Atari 2600 cartridges are individual
+catalog cards alongside the native games. Each card shows its system badge and
+box art. **Enter** plays the selected cartridge and **Backspace** returns
+straight to the catalog. **P** pauses, **R** resets the console, and the shared
+Settings overlay still freezes the machine.
+
+The picker and the running game both show the active mapping, for example
+`A:MOUSE1 - B:SPACE - START:ENTER - SELECT:TAB` for NES and
+`A:MOUSE1 - B:SPACE - X:X - Y:SHIFT - L:C - R:V - START:ENTER - SELECT:TAB`
+for Super Nintendo. The same actions are editable in Settings → Controls.
+
+The release always contains the pinned cores in `app/cores/`:
+
+| System | Core | Upstream | License |
+|---|---|---|---|
+| NES | `tetanes-core` (linked) | `lukexor/tetanes` | MIT / Apache-2.0 |
+| Super Nintendo | `snes9x_libretro.so` | `libretro/snes9x` | Snes9x free/non-commercial |
+| Game Boy Advance | `mgba_libretro.so` | `libretro/mgba` | MPL-2.0 |
+| Atari 2600 | `stella2023_libretro.so` | `libretro/stella2023` | GPL-2.0 |
+
+The shared libraries are loaded at runtime; the main executable remains MIT.
+License texts, upstream commit pins and rebuild instructions live beside the
+cores and in [Emulated systems](docs/emulators.md).
+
+The built-in library is copied from `crates/classicclassics-emulators/assets/`
+into `app/games/<system>/roms/`. Extra cartridges are discovered, in order, from
+`data/roms/<system>`, `data/roms`, `rom_dirs` in
+`data/config/emulators.toml`, and repeatable `--rom-dir` arguments. `--rom PATH`
+starts one cartridge directly and is also used by headless verification.
+Cartridge battery files and automatic save states are written atomically to
+`data/save/emulators/<system>/<id>.srm` and `.state`.
+
+```sh
+cargo run -- --game snes --rom path/to/game.sfc
+cargo run -- --game nes --rom-dir ~/Downloads/roms --rom path/to/game.nes
+cargo run --no-default-features -- --headless --game gba \
+  --rom path/to/game.gba --ticks 600 --autoplay --screenshot /tmp/gba.png
+```
+
+`--no-save` disables emulator battery/state reads and writes as well as the
+collection's records and settings.
 
 ### Settings
 
@@ -159,11 +217,15 @@ Requirements are a current stable Rust toolchain (1.94) and the usual Linux
 window/audio/Vulkan development packages:
 
 ```sh
-sudo apt install build-essential pkg-config \
+sudo apt install build-essential pkg-config libstdc++6 \
   libxkbcommon-dev libxkbcommon-x11-0 libasound2-dev libudev-dev \
   libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev libvulkan-dev
 cargo run
 ```
+
+The checked-in cores are ready to load. Rebuilding them requires `g++`, `make`
+and `cmake` (`python3 DevUtils/build_cores.py`), but a normal Rust build does
+not compile them.
 
 The native game uses Quasar's wgpu 30 renderer through Vulkan 1.3, including
 dynamic rendering, synchronization2 and timeline semaphores. `WGPU_BACKEND`
@@ -205,10 +267,17 @@ Shared library code lives under `crates/`:
 | `classicclassics-missile-command` | Imported Missile Command simulation, pixels and collection adapter |
 | `classicclassics-river-raid` | Imported River Raid simulation, pixels and collection adapter |
 | `classicclassics-fruitslicer` | Imported Fruit Slicer simulation, native-resolution renderer, menus and adapter |
+| `classicclassics-emulators` | ROM picker, cartridge identity, native TetaNES NES core, libretro host, PCM sink and shared saves |
+| `classicclassics-nes` | NES catalog identity using the shared emulator front end |
+| `classicclassics-snes` | Super Nintendo catalog identity using the shared emulator front end |
+| `classicclassics-gba` | Game Boy Advance catalog identity using the shared emulator front end |
+| `classicclassics-atari2600` | Atari 2600 catalog identity using the shared emulator front end |
 
-Every game depends on the core API and Quasar's headless draw lists. File-backed
-games also use the shared asset API; the collection supplies their mounts. Games
-do not know about the application, other games or filesystem persistence. Versions and
+Every native game depends on the core API and Quasar's headless draw lists.
+File-backed games also use the shared asset API; the collection supplies their
+mounts. The emulated systems share one front end that implements the core API
+and receive collection-discovered cartridges instead of scanning for files.
+Games do not know about the application, other games or filesystem persistence. Versions and
 Quasar dependencies are defined once in the root manifest. All crates are default
 workspace members, so the normal test and Clippy commands cover the collection.
 See [Adding a game](docs/adding-a-game.md) for the extension workflow.
@@ -240,17 +309,23 @@ separate renderer.
 
 ## Data and Basalt layout
 
-The release is a single binary plus artwork and original game assets. On first run the game creates only
+The release is a single binary plus artwork, pinned emulator cores and original
+game/cartridge assets. On first run the game creates only
 the directories it needs and honors every Basalt directory variable, falling
 back to paths relative to the install root when run outside Basalt.
 
 ```text
 <install root>/
-├── app/                       release-owned: executable, artwork, license, games/ assets
+├── app/                       release-owned: executable, artwork, cores, games/ assets
+│   ├── cores/                 pinned libretro shared libraries and licenses
+│   └── games/<system>/        built-in ROM library and per-cartridge covers/
 └── data/
     ├── save/records.json      synced high scores and progress
+    ├── save/emulators/        cartridge battery files and automatic save states
     ├── config/display.toml    machine-local window/audio settings
     ├── config/shared/controls.toml  portable bindings preset
+    ├── config/emulators.toml  optional extra ROM directories
+    ├── roms/                  optional user-supplied cartridges
     └── cache/                 reserved for rebuildable files
 ```
 
@@ -290,8 +365,9 @@ workflow also retains its Actions artifact for three days. The release skill
 downloads and compares both artifacts after publication.
 
 The release asset is `ClassicClassics-<version>-linux-x64.zip` and contains only
-`app/`, so Basalt can replace the release without touching `data/`. To build and
-inspect a local archive:
+`app/`, so Basalt can replace the release without touching `data/`. It always
+includes `app/cores/` and the built-in cartridge library; `package.py` fails if
+any pinned core is missing. To build and inspect a local archive:
 
 ```sh
 python3 DevUtils/package.py
@@ -301,6 +377,7 @@ python3 DevUtils/verify_package.py dist/ClassicClassics-*-linux-x64.zip
 ## Documentation
 
 - [Adding a game](docs/adding-a-game.md) — crate contract and registration
+- [Emulated systems](docs/emulators.md) — cores, cartridge discovery, saves, licenses and verification
 - [Quasar tilemaps](docs/quasar-tilemaps.md) — native tile/sprite rendering and fidelity checks
 - [Shared assets](docs/assets.md) — Quasar mounts, loading, ownership and recovery
 - [Architecture](docs/architecture.md) — simulation, rendering, input and host boundaries
@@ -318,7 +395,8 @@ of truth for agent instructions.
 - Keep each game in its own crate, implementing `classicclassics_core::ArcadeGame`.
   Register games in `classicclassics-collection/src/games.rs`; keep game crates
   independent of the collection and other games.
-- Keep every game a pure fixed-step simulation with a draw list. Headless tests must continue to run with `--no-default-features`.
+- Keep every native game a pure fixed-step simulation with a draw list. Emulated systems are the documented exception: they wrap a deterministic core, keep machine state in binary save states rather than JSON snapshots, and never scan for files themselves. Headless tests must continue to run with `--no-default-features`.
+- Keep emulator cores in `app/cores` and built-in cartridges in the emulator asset tree; the collection owns discovery and never writes into `app/`.
 - Preserve imported simulations and assets; maintain them in this workspace. See `docs/imported-games.md` and each game’s `UPSTREAM.md`. Do not change the original repositories.
 - Never write to `app/` at runtime. Progress goes to `data/save/`, machine settings to `data/config/`, portable settings to `data/config/shared/`, rebuildable files to `data/cache/`.
 - Write JSON user data atomically through `quasar_storage`. TOML configuration

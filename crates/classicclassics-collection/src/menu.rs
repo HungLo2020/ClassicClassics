@@ -1,7 +1,8 @@
 //! Scrolling catalog grid. Game-specific presentation lives in game crates.
 use crate::VERSION;
+use crate::catalog::CatalogEntry;
 use crate::controls::ControlHints;
-use crate::games::{GameKind, Records};
+use crate::games::Records;
 use crate::paint::{CYAN, DIM, GRID, MUTED, Paint, WHITE};
 use crate::rendering::CatalogArt;
 use quasar_render_2d::{Canvas, Rect, Sprite};
@@ -89,22 +90,29 @@ pub fn click(offset: f32, count: usize, [x, y]: [f32; 2]) -> Option<(usize, bool
     })
 }
 
-pub fn scene(selected: usize, offset: f32, records: &Records, hints: &ControlHints) -> Canvas {
-    catalog_scene(&GameKind::ALL, selected, offset, records, hints, None)
+pub fn scene(
+    catalog: &[CatalogEntry],
+    selected: usize,
+    offset: f32,
+    records: &Records,
+    hints: &ControlHints,
+) -> Canvas {
+    catalog_scene(catalog, selected, offset, records, hints, None)
 }
 
 pub fn scene_with_art(
+    catalog: &[CatalogEntry],
     selected: usize,
     offset: f32,
     records: &Records,
     hints: &ControlHints,
     art: &CatalogArt,
 ) -> Canvas {
-    catalog_scene(&GameKind::ALL, selected, offset, records, hints, Some(art))
+    catalog_scene(catalog, selected, offset, records, hints, Some(art))
 }
 
 fn catalog_scene(
-    games: &[GameKind],
+    games: &[CatalogEntry],
     selected: usize,
     offset: f32,
     records: &Records,
@@ -141,11 +149,11 @@ fn catalog_scene(
         VIEW_BOTTOM - TOP + 5.0,
     )));
     let mut paint = Paint::over(canvas);
-    for (index, kind) in games.iter().copied().enumerate() {
+    for (index, entry) in games.iter().enumerate() {
         let x = LEFT + (index % COLUMNS) as f32 * (CARD_WIDTH + GAP);
         let y = TOP + (index / COLUMNS) as f32 * ROW_PITCH - offset;
         if y + CARD_HEIGHT + 5.0 > TOP && y - 5.0 < VIEW_BOTTOM {
-            card(&mut paint, x, y, kind, index == selected, records, artwork);
+            card(&mut paint, x, y, entry, index == selected, records, artwork);
         }
     }
     let mut canvas = paint.into_canvas();
@@ -176,16 +184,40 @@ fn catalog_scene(
     paint.into_canvas()
 }
 
+fn title_layout(name: &str) -> (f32, Vec<String>) {
+    let name = name.to_uppercase();
+    let scale = if name.len() > 26 { 1.6 } else { 2.0 };
+    let limit = if scale < 2.0 { 24 } else { 21 };
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    for word in name.split_whitespace() {
+        if !line.is_empty() && line.len() + 1 + word.len() > limit {
+            lines.push(std::mem::take(&mut line));
+            if lines.len() == 2 {
+                break;
+            }
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(word);
+    }
+    if lines.len() < 2 && !line.is_empty() {
+        lines.push(line);
+    }
+    (scale, lines)
+}
+
 fn card(
     paint: &mut Paint,
     x: f32,
     y: f32,
-    kind: GameKind,
+    entry: &CatalogEntry,
     selected: bool,
     records: &Records,
     artwork: Option<&CatalogArt>,
 ) {
-    let accent = kind.accent();
+    let accent = entry.accent();
     if selected {
         paint.rect(
             x - 5.0,
@@ -203,17 +235,35 @@ fn card(
         CARD_HEIGHT,
         if selected { accent } else { GRID },
     );
-    if let Some(texture) = artwork.and_then(|art| art.get(kind)) {
+    if let Some(texture) = artwork.and_then(|art| art.get_entry(entry)) {
         let mut sprite = Sprite::new(texture, Rect::new(x + 20.0, y + 20.0, 216.0, 288.0));
         sprite.filter = Some(quasar_render_2d::Filter::Linear);
         paint.sprite(sprite);
-        paint.text(x + 260.0, y + 22.0, kind.number(), 2.0, accent);
-        paint.text(x + 260.0, y + 59.0, &kind.name().to_uppercase(), 2.0, WHITE);
+        paint.text(x + 260.0, y + 22.0, entry.number(), 2.0, accent);
+        paint.text(x + 260.0, y + 42.0, entry.system(), 1.2, MUTED);
+        let (title_scale, title_lines) = title_layout(entry.name());
+        for (row, line) in title_lines.iter().enumerate() {
+            paint.text(
+                x + 260.0,
+                y + 63.0 + row as f32 * 20.0,
+                line,
+                title_scale,
+                WHITE,
+            );
+        }
+        let tagline = entry.tagline();
+        let tagline_top = y + 104.0 + title_lines.len().saturating_sub(1) as f32 * 20.0;
         let mut line = String::new();
         let mut row = 0;
-        for word in kind.tagline().split_whitespace() {
+        for word in tagline.split_whitespace() {
             if line.len() + word.len() > 25 && !line.is_empty() {
-                paint.text(x + 260.0, y + 104.0 + row as f32 * 22.0, &line, 1.4, MUTED);
+                paint.text(
+                    x + 260.0,
+                    tagline_top + row as f32 * 22.0,
+                    &line,
+                    1.4,
+                    MUTED,
+                );
                 line.clear();
                 row += 1;
             }
@@ -222,8 +272,14 @@ fn card(
             }
             line.push_str(word);
         }
-        paint.text(x + 260.0, y + 104.0 + row as f32 * 22.0, &line, 1.4, MUTED);
-        let (label, value) = kind.catalog_record(records);
+        paint.text(
+            x + 260.0,
+            tagline_top + row as f32 * 22.0,
+            &line,
+            1.4,
+            MUTED,
+        );
+        let (label, value) = entry.catalog_record(records);
         paint.text(x + 260.0, y + 222.0, label, 1.5, DIM);
         paint.text(x + 260.0, y + 250.0, &value, 2.0, accent);
         paint.text(
@@ -246,7 +302,8 @@ fn card(
         );
         return;
     }
-    paint.text(x + 24.0, y + 20.0, kind.number(), 2.0, accent);
+    paint.text(x + 24.0, y + 20.0, entry.number(), 2.0, accent);
+    paint.text(x + 82.0, y + 22.0, entry.system(), 1.4, MUTED);
     paint.right(
         x + CARD_WIDTH - 24.0,
         y + 20.0,
@@ -254,8 +311,23 @@ fn card(
         2.0,
         if selected { accent } else { DIM },
     );
-    paint.text(x + 24.0, y + 58.0, &kind.name().to_uppercase(), 3.0, WHITE);
-    paint.text(x + 24.0, y + 92.0, kind.tagline(), 2.0, MUTED);
+    let (title_scale, title_lines) = title_layout(entry.name());
+    for (row, line) in title_lines.iter().enumerate() {
+        paint.text(
+            x + 24.0,
+            y + 58.0 + row as f32 * 22.0,
+            line,
+            title_scale,
+            WHITE,
+        );
+    }
+    paint.text(
+        x + 24.0,
+        y + 92.0 + title_lines.len().saturating_sub(1) as f32 * 22.0,
+        &entry.tagline(),
+        2.0,
+        MUTED,
+    );
     paint.rect(x + 24.0, y + 124.0, CARD_WIDTH - 48.0, 1.0, GRID);
     paint.rect(
         x + 24.0,
@@ -264,9 +336,9 @@ fn card(
         142.0,
         [7, 11, 19, 255],
     );
-    kind.motif(paint, x + CARD_WIDTH * 0.5, y + 203.0);
+    entry.motif(paint, x + CARD_WIDTH * 0.5, y + 203.0);
     paint.rect(x + 24.0, y + 286.0, CARD_WIDTH - 48.0, 1.0, GRID);
-    let (label, value) = kind.catalog_record(records);
+    let (label, value) = entry.catalog_record(records);
     paint.text(x + 24.0, y + 304.0, label, 2.0, DIM);
     paint.right(x + CARD_WIDTH - 24.0, y + 304.0, &value, 2.0, accent);
     paint.text(
@@ -292,7 +364,8 @@ mod tests {
         assert_eq!(scroll_offset(0), 0.0);
         assert_eq!(scroll_offset(5), 0.0);
         assert_eq!(scroll_offset(6), ROW_PITCH);
-        let games = [GameKind::Pong; 8];
+        let games: [CatalogEntry; 8] =
+            std::array::from_fn(|_| CatalogEntry::Game(crate::GameKind::Pong));
         for selected in 0..games.len() {
             let canvas = catalog_scene(
                 &games,

@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlparse
 import zipfile
 
 from DevUtils.release import publish, validate_target
-from DevUtils.package import game_assets
+from DevUtils.package import core_assets, game_assets
 
 SHA = "a" * 40
 NEXT_SHA = "b" * 40
@@ -98,6 +98,11 @@ class ReleaseTests(unittest.TestCase):
                 output.writestr(name, b"test fixture")
             for _, destination in game_assets():
                 output.writestr(destination, b"asset fixture")
+            for _, destination in core_assets():
+                output.writestr(
+                    destination,
+                    b"x" * 100_001 if destination.endswith(".so") else b"core fixture",
+                )
         self.api = FakeGitHub()
 
     def test_first_release_then_replacement_keeps_one_release_one_zip_and_moves_only_latest(self):

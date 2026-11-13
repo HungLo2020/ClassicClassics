@@ -32,3 +32,7 @@ classicclassics-jackal.workspace = true
 classicclassics-missile-command.workspace = true
 classicclassics-river-raid.workspace = true
 classicclassics-fruitslicer.workspace = true
+classicclassics-nes.workspace = true
+classicclassics-snes.workspace = true
+classicclassics-gba.workspace = true
+classicclassics-atari2600.workspace = true

@@ -14,10 +14,13 @@ use quasar_ui::{
 const WIDTH: f32 = 960.0;
 const HEIGHT: f32 = 600.0;
 const TABLE_TOP: f32 = 70.0;
-const ROW_HEIGHT: f32 = 31.0;
+const ROW_HEIGHT: f32 = 26.0;
 const GAMEPLAY: &[&str] = &[
     controls::FIRE,
     controls::JUMP,
+    controls::SHOULDER_LEFT,
+    controls::SHOULDER_RIGHT,
+    controls::AUX,
     controls::MOVE_HORIZONTAL,
     controls::MOVE_VERTICAL,
     controls::THRUST,
@@ -78,6 +81,9 @@ pub fn action_label(action: &str) -> String {
         controls::MOVE_HORIZONTAL => "MOVE LEFT / RIGHT",
         controls::MOVE_VERTICAL => "MOVE UP / DOWN",
         controls::JUMP => "JUMP / RIGHT BATTERY",
+        controls::SHOULDER_LEFT => "SHOULDER L",
+        controls::SHOULDER_RIGHT => "SHOULDER R",
+        controls::AUX => "EMULATOR X",
         controls::P2_HORIZONTAL => "PLAYER 2 LEFT / RIGHT",
         controls::P2_FIRE => "PLAYER 2 FIRE",
         controls::P2_JUMP => "PLAYER 2 JUMP",

@@ -356,6 +356,9 @@ fn build_input(keyboard: &InputState, gamepad: &InputState, stick: &mut StickNav
         jump_pressed: merged_action(keyboard, gamepad, controls::JUMP).pressed,
         secondary: merged_action(keyboard, gamepad, controls::HYPERSPACE).held(),
         secondary_pressed: merged_action(keyboard, gamepad, controls::HYPERSPACE).pressed,
+        shoulder_left: merged_action(keyboard, gamepad, controls::SHOULDER_LEFT).held(),
+        shoulder_right: merged_action(keyboard, gamepad, controls::SHOULDER_RIGHT).held(),
+        aux: merged_action(keyboard, gamepad, controls::AUX).held(),
         other_players: [Default::default(); 3],
         pointer: None,
         ui_pointer: None,
@@ -829,6 +832,9 @@ impl App {
                     jump: pad.action(controls::JUMP).held() || pad.action(controls::JUMP).pressed,
                     secondary: pad.action(controls::HYPERSPACE).held()
                         || pad.action(controls::HYPERSPACE).pressed,
+                    shoulder_left: pad.action(controls::SHOULDER_LEFT).held(),
+                    shoulder_right: pad.action(controls::SHOULDER_RIGHT).held(),
+                    aux: pad.action(controls::AUX).held(),
                 };
                 if slot == 1 {
                     state.x = axis(
@@ -989,6 +995,9 @@ impl App {
             || matches!(&self.session.screen, classicclassics_collection::session::Screen::Game(game) if game.paused());
         audio.pause_music(paused);
         audio.pause_game_audio(paused);
+        if let Some(samples) = self.session.take_audio() {
+            audio.play_emulator(samples);
+        }
         for sound in self.session.sounds.drain(..) {
             audio.play(sound, &self.bank, 0.0);
         }
@@ -1195,6 +1204,7 @@ impl Application for App {
             profile.report();
         }
         self.write_screenshot()?;
+        self.session.save_runtime();
         self.save_outputs()?;
         self.presenter.take();
         Ok(())

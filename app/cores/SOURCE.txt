@@ -1,0 +1,7 @@
+Classic Classics emulator cores
+
+snes9x: https://github.com/libretro/snes9x @ fae2fea08f74180759ef540ee94259213f503480
+mgba: https://github.com/libretro/mgba @ 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
+stella2023: https://github.com/libretro/stella2023 @ ba52c43b9eda950eb0c0eec69cda9b17dee8c39b
+
+Rebuild with DevUtils/build_cores.py. License texts are in LICENSES/.

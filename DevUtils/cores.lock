@@ -1,0 +1,20 @@
+{
+  "snes9x": {
+    "repository": "libretro/snes9x",
+    "commit": "fae2fea08f74180759ef540ee94259213f503480",
+    "core": "snes9x_libretro.so",
+    "license": "LICENSES/snes9x.txt"
+  },
+  "mgba": {
+    "repository": "libretro/mgba",
+    "commit": "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6",
+    "core": "mgba_libretro.so",
+    "license": "LICENSES/mgba.txt"
+  },
+  "stella2023": {
+    "repository": "libretro/stella2023",
+    "commit": "ba52c43b9eda950eb0c0eec69cda9b17dee8c39b",
+    "core": "stella2023_libretro.so",
+    "license": "LICENSES/stella2023.txt"
+  }
+}

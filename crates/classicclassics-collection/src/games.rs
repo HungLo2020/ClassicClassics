@@ -1,5 +1,7 @@
 //! Register a game once here to connect catalog, CLI, dispatch and records.
-use classicclassics_core::{ArcadeGame, ControlHints, GameInfo, Input, Sound, paint::Paint};
+use classicclassics_core::{
+    ArcadeGame, ControlHints, EmulatorAudio, GameInfo, GameLoadContext, Input, Sound, paint::Paint,
+};
 use quasar_render_2d::Canvas;
 use serde::{Deserialize, Serialize};
 
@@ -48,11 +50,23 @@ macro_rules! games {
             pub fn load(kind: GameKind, root: Option<&classicclassics_assets::Directory>) -> Result<Self, String> {
                 match kind { $(GameKind::$variant => $game::Game::load(root).map(|game| Self::$variant(Box::new(game))),)+ }
             }
+            pub fn load_with(kind: GameKind, ctx: &GameLoadContext) -> Result<Self, String> {
+                match kind { $(GameKind::$variant => $game::Game::load_with(ctx).map(|game| Self::$variant(Box::new(game))),)+ }
+            }
             pub fn kind(&self) -> GameKind {
                 match self { $(Self::$variant(_) => GameKind::$variant,)+ }
             }
             pub fn tick(&mut self, input: Input, sounds: &mut Vec<Sound>) {
                 match self { $(Self::$variant(game) => game.tick(input, sounds),)+ }
+            }
+            pub fn take_audio(&mut self) -> Option<EmulatorAudio> {
+                match self { $(Self::$variant(game) => game.take_audio(),)+ }
+            }
+            pub fn back_to_picker(&mut self) -> bool {
+                match self { $(Self::$variant(game) => game.back_to_picker(),)+ }
+            }
+            pub fn save(&mut self) {
+                match self { $(Self::$variant(game) => game.save(),)+ }
             }
             pub fn paused(&self) -> bool {
                 match self { $(Self::$variant(game) => game.paused(),)+ }
@@ -106,10 +120,14 @@ use classicclassics_fruitslicer as fruitslicer;
 use classicclassics_lunar as lunar;
 use classicclassics_pong as pong;
 
+use classicclassics_atari2600 as atari2600;
+use classicclassics_gba as gba;
 use classicclassics_jackal as jackal;
 use classicclassics_micromages as micromages;
 use classicclassics_missile_command as missile;
+use classicclassics_nes as nes;
 use classicclassics_river_raid as river;
+use classicclassics_snes as snes;
 
 games! {
     Pong => pong, pong, "01";
@@ -120,6 +138,53 @@ games! {
     MissileCommand => missile, missile, "06";
     RiverRaid => river, river, "07";
     FruitSlicer => fruitslicer, fruitslicer, "08";
+    Nes => nes, nes, "09";
+    Snes => snes, snes, "10";
+    Gba => gba, gba, "11";
+    Atari2600 => atari2600, atari2600, "12";
+}
+
+impl GameKind {
+    pub fn is_emulator(self) -> bool {
+        self.emulator_system().is_some()
+    }
+
+    pub fn from_emulator_system(system: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|kind| kind.emulator_system() == Some(system))
+    }
+
+    /// Emulated systems discover cartridges instead of owning one simulation.
+    pub fn emulator_system(self) -> Option<&'static str> {
+        match self {
+            Self::Nes => Some("nes"),
+            Self::Snes => Some("snes"),
+            Self::Gba => Some("gba"),
+            Self::Atari2600 => Some("atari2600"),
+            _ => None,
+        }
+    }
+
+    pub fn system_short(self) -> Option<&'static str> {
+        match self {
+            Self::Nes => Some("NES"),
+            Self::Snes => Some("SNES"),
+            Self::Gba => Some("GBA"),
+            Self::Atari2600 => Some("ATARI 2600"),
+            _ => None,
+        }
+    }
+
+    pub fn rom_extensions(self) -> &'static [&'static str] {
+        match self {
+            Self::Nes => &["nes"],
+            Self::Snes => &["sfc", "smc"],
+            Self::Gba => &["gba", "agb"],
+            Self::Atari2600 => &["a26", "bin"],
+            _ => &[],
+        }
+    }
 }
 
 #[cfg(test)]

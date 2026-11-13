@@ -14,6 +14,10 @@ Game options:
   --autoplay                deterministic attract mode
   --screenshot PATH         write a PNG after the run
   --state PATH              write a JSON state snapshot after the run
+  --rom PATH                start an emulated system with this cartridge
+  --rom-dir PATH            add a cartridge directory (repeatable)
+  --core-dir PATH           override the app/cores directory
+  --catalog-index N         select a catalog card for screenshots/debugging
   --smoke-frames N          present N window frames and exit
   --exercise-window         resize/fullscreen/filter scaling smoke test
   --linear                  start with linear filtering
@@ -48,6 +52,10 @@ pub struct Options {
     pub autoplay: bool,
     pub screenshot: Option<PathBuf>,
     pub state: Option<PathBuf>,
+    pub rom: Option<PathBuf>,
+    pub rom_dirs: Vec<PathBuf>,
+    pub core_dir: Option<PathBuf>,
+    pub catalog_index: Option<usize>,
     pub smoke_frames: Option<u64>,
     pub exercise_window: bool,
     pub bindings: Option<PathBuf>,
@@ -71,6 +79,10 @@ impl Options {
             autoplay: false,
             screenshot: None,
             state: None,
+            rom: None,
+            rom_dirs: Vec::new(),
+            core_dir: None,
+            catalog_index: None,
             smoke_frames: None,
             exercise_window: false,
             bindings: None,
@@ -107,6 +119,10 @@ impl Options {
                 "--autoplay" => options.autoplay = true,
                 "--screenshot" => options.screenshot = Some(value()?.into()),
                 "--state" => options.state = Some(value()?.into()),
+                "--rom" => options.rom = Some(value()?.into()),
+                "--rom-dir" => options.rom_dirs.push(value()?.into()),
+                "--core-dir" => options.core_dir = Some(value()?.into()),
+                "--catalog-index" => options.catalog_index = Some(value()?.parse()?),
                 "--smoke-frames" => options.smoke_frames = Some(value()?.parse()?),
                 "--exercise-window" => options.exercise_window = true,
                 "--linear" => options.linear = true,

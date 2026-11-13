@@ -34,6 +34,15 @@ Adding a registration automatically updates CLI lookup/help and catalog entries.
 The existing enum serialization tags and version-one record field names remain
 unchanged. See [Adding a game](adding-a-game.md).
 
+The four emulated systems use the same registration path but own no native
+simulation. The collection discovers cartridges and emits one `CatalogEntry` per
+native game or cartridge, so cards, labels, box art and wheel navigation do not
+need system submenus. It supplies a `GameLoadContext`, and the shared emulator
+front end drives a native TetaNES core or a pinned libretro shared library. Their
+machine state lives in binary save files instead of JSON snapshots; the picker
+and selected cartridge identity still serialize. See
+[Emulated systems](emulators.md).
+
 All packages are default workspace members, so `cargo test` and `cargo clippy`
 cover every crate. The workspace owns versions and external dependency pins.
 The root package remains named `classicclassics`, preserving Cargo run commands,
