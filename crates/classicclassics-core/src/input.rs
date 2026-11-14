@@ -7,6 +7,9 @@ pub struct Input {
     pub menu_left: bool,
     pub menu_right: bool,
     pub confirm: bool,
+    /// Emulated console Start/Select, separate from menu confirm and mode.
+    pub start: bool,
+    pub select: bool,
     pub back: bool,
     pub settings: bool,
     pub move_x: i8,

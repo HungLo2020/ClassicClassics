@@ -12,8 +12,8 @@ use quasar_render_2d::Canvas;
 const PANEL_X: f32 = 186.0;
 const PANEL_Y: f32 = 56.0;
 const PANEL_WIDTH: f32 = 588.0;
-const PANEL_HEIGHT: f32 = 446.0;
-const ROW_HEIGHT: f32 = 25.0;
+const PANEL_HEIGHT: f32 = 500.0;
+const ROW_HEIGHT: f32 = 22.0;
 const ROWS_TOP: f32 = 150.0;
 
 const WINDOW_PRESETS: [(u32, u32); 6] = [
@@ -25,9 +25,20 @@ const WINDOW_PRESETS: [(u32, u32); 6] = [
     (1920, 1080),
 ];
 
+/// Save-state availability is emulator-only. Native games always leave this
+/// unsupported.
+#[derive(Clone, Debug, Default)]
+pub struct StateInfo {
+    pub supported: bool,
+    pub has_state: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Row {
     Resume,
+    SaveState,
+    LoadState,
+    DeleteState,
     Fullscreen,
     Window,
     Filtering,
@@ -41,9 +52,16 @@ enum Row {
     Quit,
 }
 
-fn rows(from_game: bool) -> Vec<Row> {
-    let mut rows = vec![
-        Row::Resume,
+fn rows(from_game: bool, state: &StateInfo) -> Vec<Row> {
+    let mut rows = vec![Row::Resume];
+    if from_game && state.supported {
+        rows.push(Row::SaveState);
+        if state.has_state {
+            rows.push(Row::LoadState);
+            rows.push(Row::DeleteState);
+        }
+    }
+    rows.extend([
         Row::Fullscreen,
         Row::Window,
         Row::Filtering,
@@ -52,7 +70,7 @@ fn rows(from_game: bool) -> Vec<Row> {
         Row::Volume,
         Row::Mute,
         Row::Controls,
-    ];
+    ]);
     if from_game {
         rows.push(Row::Catalog);
     }
@@ -67,6 +85,9 @@ pub enum Outcome {
     Close,
     LeaveToCatalog,
     Controls,
+    SaveState,
+    LoadState,
+    DeleteState,
     Quit,
 }
 
@@ -74,14 +95,23 @@ pub enum Outcome {
 pub struct SettingsScreen {
     pub selection: usize,
     pub from_game: bool,
+    pub state: StateInfo,
+    status: Option<String>,
 }
 
 impl SettingsScreen {
-    pub fn new(from_game: bool) -> Self {
+    pub fn new(from_game: bool, state: StateInfo) -> Self {
         Self {
             selection: 0,
             from_game,
+            state,
+            status: None,
         }
+    }
+
+    pub fn update_state(&mut self, state: StateInfo, status: impl Into<String>) {
+        self.state = state;
+        self.status = Some(status.into().to_uppercase().chars().take(88).collect());
     }
 
     pub fn tick(
@@ -90,7 +120,7 @@ impl SettingsScreen {
         settings: &mut Settings,
         sounds: &mut Vec<Sound>,
     ) -> Outcome {
-        let rows = rows(self.from_game);
+        let rows = rows(self.from_game, &self.state);
         if self.selection >= rows.len() {
             self.selection = rows.len().saturating_sub(1);
         }
@@ -130,6 +160,24 @@ impl SettingsScreen {
                 if input.confirm {
                     sounds.push(Sound::MenuSelect);
                     return Outcome::Close;
+                }
+            }
+            Row::SaveState => {
+                if input.confirm {
+                    sounds.push(Sound::MenuSelect);
+                    return Outcome::SaveState;
+                }
+            }
+            Row::LoadState => {
+                if input.confirm {
+                    sounds.push(Sound::MenuSelect);
+                    return Outcome::LoadState;
+                }
+            }
+            Row::DeleteState => {
+                if input.confirm {
+                    sounds.push(Sound::MenuSelect);
+                    return Outcome::DeleteState;
                 }
             }
             Row::Fullscreen => {
@@ -266,7 +314,7 @@ impl SettingsScreen {
             if self.from_game { AMBER } else { CYAN },
         );
 
-        let rows = rows(self.from_game);
+        let rows = rows(self.from_game, &self.state);
         for (index, row) in rows.iter().copied().enumerate() {
             let y = ROWS_TOP + index as f32 * ROW_HEIGHT;
             let selected = index == self.selection;
@@ -297,7 +345,7 @@ impl SettingsScreen {
                 1.0,
                 if selected { WHITE } else { MUTED },
             );
-            if let Some(value) = row.value(settings) {
+            if let Some(value) = row.value(settings, &self.state) {
                 paint.right(
                     PANEL_X + PANEL_WIDTH - 40.0,
                     y,
@@ -325,7 +373,14 @@ impl SettingsScreen {
                 );
             } else if matches!(
                 row,
-                Row::Resume | Row::Controls | Row::Catalog | Row::Reset | Row::Quit
+                Row::Resume
+                    | Row::SaveState
+                    | Row::LoadState
+                    | Row::DeleteState
+                    | Row::Controls
+                    | Row::Catalog
+                    | Row::Reset
+                    | Row::Quit
             ) {
                 paint.text(
                     PANEL_X + PANEL_WIDTH - 54.0,
@@ -337,22 +392,14 @@ impl SettingsScreen {
             }
         }
 
-        if settings.volume > 0.0 && !settings.muted {
+        if settings.volume > 0.0
+            && !settings.muted
+            && let Some(index) = rows.iter().position(|row| *row == Row::Volume)
+        {
+            let y = ROWS_TOP + index as f32 * ROW_HEIGHT + 3.0;
             let width = 110.0 * settings.volume;
-            paint.rect(
-                PANEL_X + 300.0,
-                ROWS_TOP + 6.0 * ROW_HEIGHT + 3.0,
-                110.0,
-                5.0,
-                [22, 35, 47, 255],
-            );
-            paint.rect(
-                PANEL_X + 300.0,
-                ROWS_TOP + 6.0 * ROW_HEIGHT + 3.0,
-                width,
-                5.0,
-                GREEN,
-            );
+            paint.rect(PANEL_X + 300.0, y, 110.0, 5.0, [22, 35, 47, 255]);
+            paint.rect(PANEL_X + 300.0, y, width, 5.0, GREEN);
         }
 
         paint.rect(
@@ -375,7 +422,9 @@ impl SettingsScreen {
         paint.text(
             PANEL_X + 22.0,
             PANEL_Y + PANEL_HEIGHT - 13.0,
-            "DISPLAY AND AUDIO CHANGES APPLY IMMEDIATELY AND SAVE ON EXIT",
+            self.status
+                .as_deref()
+                .unwrap_or("DISPLAY AND AUDIO CHANGES APPLY IMMEDIATELY AND SAVE ON EXIT"),
             1.0,
             [55, 76, 92, 255],
         );
@@ -387,6 +436,9 @@ impl Row {
     fn label(self) -> &'static str {
         match self {
             Self::Resume => "RESUME",
+            Self::SaveState => "SAVE STATE",
+            Self::LoadState => "LOAD STATE",
+            Self::DeleteState => "DELETE STATE",
             Self::Fullscreen => "FULLSCREEN",
             Self::Window => "RESOLUTION",
             Self::Filtering => "FILTERING",
@@ -401,8 +453,11 @@ impl Row {
         }
     }
 
-    fn value(self, settings: &Settings) -> Option<String> {
+    fn value(self, settings: &Settings, state: &StateInfo) -> Option<String> {
         match self {
+            Self::SaveState => Some("CREATE".into()),
+            Self::LoadState => Some(if state.has_state { "RESTORE" } else { "EMPTY" }.into()),
+            Self::DeleteState => Some("REMOVE".into()),
             Self::Fullscreen => Some(if settings.fullscreen { "ON" } else { "OFF" }.into()),
             Self::Window => Some(if settings.auto_resolution {
                 format!("AUTO ({} x {})", settings.width, settings.height)
@@ -470,7 +525,7 @@ mod tests {
 
     fn screen(from_game: bool) -> (SettingsScreen, Settings, Vec<Sound>) {
         (
-            SettingsScreen::new(from_game),
+            SettingsScreen::new(from_game, StateInfo::default()),
             Settings::default(),
             Vec::new(),
         )
@@ -482,7 +537,7 @@ mod tests {
         sounds: &mut Vec<Sound>,
         row: Row,
     ) {
-        let list = rows(screen.from_game);
+        let list = rows(screen.from_game, &screen.state);
         screen.selection = list.iter().position(|candidate| *candidate == row).unwrap();
         assert_eq!(
             screen.tick(
@@ -511,7 +566,7 @@ mod tests {
         activate(&mut screen, &mut settings, &mut sounds, Row::Mute);
         assert!(settings.muted);
 
-        let list = rows(false);
+        let list = rows(false, &screen.state);
         screen.selection = list.iter().position(|row| *row == Row::Volume).unwrap();
         screen.tick(
             Input {
@@ -523,7 +578,7 @@ mod tests {
         );
         assert!(settings.volume > 0.8);
 
-        let list = rows(false);
+        let list = rows(false, &screen.state);
         screen.selection = list.iter().position(|row| *row == Row::Window).unwrap();
         screen.tick(
             Input {
@@ -546,7 +601,7 @@ mod tests {
         assert!(settings.fullscreen && settings.auto_resolution);
         assert!(!settings.linear);
 
-        let list = rows(true);
+        let list = rows(true, &screen.state);
         screen.selection = list.iter().position(|row| *row == Row::Catalog).unwrap();
         assert_eq!(
             screen.tick(
@@ -560,7 +615,7 @@ mod tests {
             Outcome::LeaveToCatalog
         );
 
-        let list = rows(true);
+        let list = rows(true, &screen.state);
         screen.selection = list.iter().position(|row| *row == Row::Quit).unwrap();
         assert_eq!(
             screen.tick(
@@ -574,7 +629,7 @@ mod tests {
             Outcome::Quit
         );
 
-        let list = rows(true);
+        let list = rows(true, &screen.state);
         screen.selection = list.iter().position(|row| *row == Row::Resume).unwrap();
         assert_eq!(
             screen.tick(
@@ -587,6 +642,49 @@ mod tests {
             ),
             Outcome::Close
         );
+    }
+
+    #[test]
+    fn save_state_rows_are_emulator_only_and_require_an_existing_state_for_load() {
+        let mut settings = Settings::default();
+        let mut sounds = Vec::new();
+        let mut screen = SettingsScreen::new(true, StateInfo::default());
+        assert!(!rows(true, &screen.state).contains(&Row::SaveState));
+
+        screen = SettingsScreen::new(
+            true,
+            StateInfo {
+                supported: true,
+                has_state: false,
+            },
+        );
+        let list = rows(true, &screen.state);
+        assert!(list.contains(&Row::SaveState));
+        assert!(!list.contains(&Row::LoadState));
+        assert!(!list.contains(&Row::DeleteState));
+
+        screen.state.has_state = true;
+        let list = rows(true, &screen.state);
+        for row in [Row::SaveState, Row::LoadState, Row::DeleteState] {
+            screen.selection = list.iter().position(|candidate| *candidate == row).unwrap();
+            let expected = match row {
+                Row::SaveState => Outcome::SaveState,
+                Row::LoadState => Outcome::LoadState,
+                Row::DeleteState => Outcome::DeleteState,
+                _ => unreachable!(),
+            };
+            assert_eq!(
+                screen.tick(
+                    Input {
+                        confirm: true,
+                        ..Default::default()
+                    },
+                    &mut settings,
+                    &mut sounds
+                ),
+                expected
+            );
+        }
     }
 
     #[test]

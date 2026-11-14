@@ -53,8 +53,8 @@ pub trait EmulatorSystem: Default + Clone + Copy + std::fmt::Debug + Send + 'sta
             h.hyperspace,
             h.shoulder_left,
             h.shoulder_right,
-            h.confirm,
-            h.mode,
+            h.start,
+            h.select,
             h.settings
         )
     }
@@ -107,8 +107,8 @@ pub trait EmulatorSystem: Default + Clone + Copy + std::fmt::Debug + Send + 'sta
             input.aux,
             input.shoulder_left,
             input.shoulder_right,
-            input.confirm,
-            input.mode,
+            input.start,
+            input.select,
             input.move_x,
             input.move_y,
         );

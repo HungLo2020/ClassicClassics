@@ -11,6 +11,8 @@ pub const MENU_DOWN: &str = "menu_down";
 pub const MENU_LEFT: &str = "menu_left";
 pub const MENU_RIGHT: &str = "menu_right";
 pub const CONFIRM: &str = "confirm";
+pub const START: &str = "start";
+pub const SELECT: &str = "select";
 pub const BACK: &str = "back";
 pub const SETTINGS: &str = "settings";
 pub const MOVE_HORIZONTAL: &str = "move_horizontal";
@@ -41,12 +43,14 @@ pub const SCALE: &str = "scale";
 pub const MENU_HORIZONTAL: &str = "menu_horizontal";
 pub const MENU_VERTICAL: &str = "menu_vertical";
 
-pub const ACTIONS: [&str; 33] = [
+pub const ACTIONS: [&str; 35] = [
     MENU_UP,
     MENU_DOWN,
     MENU_LEFT,
     MENU_RIGHT,
     CONFIRM,
+    START,
+    SELECT,
     BACK,
     SETTINGS,
     P1,
@@ -160,6 +164,11 @@ impl Default for Controls {
             .bind(CONFIRM, Binding::key(Key::NumpadEnter))
             .bind(CONFIRM, Binding::key(Key::Space))
             .bind(CONFIRM, Binding::gamepad_button(GamepadButton::South))
+            .bind(START, Binding::key(Key::Enter))
+            .bind(START, Binding::key(Key::NumpadEnter))
+            .bind(START, Binding::gamepad_button(GamepadButton::Start))
+            .bind(SELECT, Binding::key(Key::Tab))
+            .bind(SELECT, Binding::gamepad_button(GamepadButton::LeftStick))
             .bind(BACK, Binding::key(Key::Backspace))
             .bind(BACK, Binding::gamepad_button(GamepadButton::Select))
             .bind(SETTINGS, Binding::key(Key::Escape))
@@ -193,9 +202,9 @@ impl Default for Controls {
             .bind(HYPERSPACE, Binding::key(Key::ShiftRight))
             .bind(HYPERSPACE, Binding::gamepad_button(GamepadButton::West))
             .bind(PAUSE, Binding::key(Key::KeyP))
-            .bind(PAUSE, Binding::gamepad_button(GamepadButton::Start))
+            .bind(PAUSE, Binding::gamepad_button(GamepadButton::RightStick))
             .bind(RESTART, Binding::key(Key::KeyR))
-            .bind(RESTART, Binding::gamepad_button(GamepadButton::RightStick))
+            .bind(RESTART, Binding::gamepad_button(GamepadButton::Mode))
             .bind(MODE, Binding::key(Key::Tab))
             .bind(MODE, Binding::gamepad_button(GamepadButton::North))
             .bind(MUTE, Binding::key(Key::KeyM))
@@ -290,6 +299,8 @@ impl Controls {
             SHOULDER_LEFT,
             SHOULDER_RIGHT,
             AUX,
+            START,
+            SELECT,
             P2_HORIZONTAL,
             P2_FIRE,
             P2_JUMP,
@@ -301,14 +312,28 @@ impl Controls {
                 .entry(name.into())
                 .or_insert_with(|| defaults.bindings.actions[name].clone());
         }
-        // Shipped presets before emulator shoulders used LB for Restart. Move
-        // that one default so LB can be the emulator L shoulder.
-        if let Some(values) = controls.bindings.actions.get_mut(RESTART) {
-            let old = Binding::gamepad_button(GamepadButton::LeftBumper);
+        // Older shipped presets used Start for collection Pause and LB/right
+        // stick for Restart. Free Start for emulator Start and give Pause a
+        // reliable dedicated click.
+        if let Some(values) = controls.bindings.actions.get_mut(PAUSE) {
+            let old = Binding::gamepad_button(GamepadButton::Start);
             let new = Binding::gamepad_button(GamepadButton::RightStick);
-            if values.contains(&old) && !values.contains(&new) {
+            if values.contains(&old) {
                 values.retain(|value| *value != old);
-                values.push(new);
+                if !values.contains(&new) {
+                    values.push(new);
+                }
+            }
+        }
+        if let Some(values) = controls.bindings.actions.get_mut(RESTART) {
+            let old_lb = Binding::gamepad_button(GamepadButton::LeftBumper);
+            let old_stick = Binding::gamepad_button(GamepadButton::RightStick);
+            let new = Binding::gamepad_button(GamepadButton::Mode);
+            if values.contains(&old_lb) || values.contains(&old_stick) {
+                values.retain(|value| *value != old_lb && *value != old_stick);
+                if !values.contains(&new) {
+                    values.push(new);
+                }
             }
         }
         controls.validate()?;
@@ -389,6 +414,8 @@ impl Controls {
         };
         ControlHints {
             confirm: label(CONFIRM),
+            start: label(START),
+            select: label(SELECT),
             back: label(BACK),
             settings: label(SETTINGS),
             menu_left: label(MENU_LEFT),

@@ -344,6 +344,8 @@ fn build_input(keyboard: &InputState, gamepad: &InputState, stick: &mut StickNav
         menu_left,
         menu_right,
         confirm: confirm.pressed,
+        start: merged_action(keyboard, gamepad, controls::START).held(),
+        select: merged_action(keyboard, gamepad, controls::SELECT).held(),
         back: back.pressed,
         settings: settings.pressed || keyboard.pressed(Key::Escape),
         move_x: axis(merged_action(keyboard, gamepad, controls::MOVE_HORIZONTAL).value),

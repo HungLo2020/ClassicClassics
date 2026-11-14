@@ -7,7 +7,7 @@ use crate::controls_screen::{CaptureEvent, ControlsScreen};
 use crate::menu;
 use crate::roms;
 use crate::settings::Settings;
-use crate::settings_screen::{self, SettingsScreen};
+use crate::settings_screen::{self, SettingsScreen, StateInfo};
 use classicclassics_core::{EmulatorAudio, GameLoadContext};
 use quasar_render_2d::Canvas;
 use serde::Serialize;
@@ -148,9 +148,52 @@ impl Session {
         self.settings_screen.is_some()
     }
 
+    pub fn state_info(&self) -> StateInfo {
+        match &self.screen {
+            Screen::Game(game) => game.state_info(),
+            Screen::Menu => StateInfo::default(),
+        }
+    }
+
     pub fn open_settings(&mut self) {
         let from_game = matches!(self.screen, Screen::Game(_));
-        self.settings_screen = Some(SettingsScreen::new(from_game));
+        self.settings_screen = Some(SettingsScreen::new(from_game, self.state_info()));
+    }
+
+    fn save_current_state(&mut self) -> Result<(), String> {
+        match &mut self.screen {
+            Screen::Game(game) => game.save_state(),
+            Screen::Menu => Err("save states are only available for emulated games".into()),
+        }
+    }
+
+    fn load_current_state(&mut self) -> Result<(), String> {
+        match &mut self.screen {
+            Screen::Game(game) => game.load_state(),
+            Screen::Menu => Err("save states are only available for emulated games".into()),
+        }
+    }
+
+    fn delete_current_state(&mut self) -> Result<(), String> {
+        match &mut self.screen {
+            Screen::Game(game) => game.delete_state(),
+            Screen::Menu => Err("save states are only available for emulated games".into()),
+        }
+    }
+
+    fn update_state_screen(&mut self, result: Result<(), String>, success: &str) {
+        let message = match result {
+            Ok(()) => success.to_owned(),
+            Err(error) => error,
+        };
+        let deleted = success == "STATE DELETED";
+        let info = self.state_info();
+        if let Some(screen) = &mut self.settings_screen {
+            screen.update_state(info, message);
+            if deleted {
+                screen.selection = 1;
+            }
+        }
     }
 
     pub fn open_controls(&mut self) {
@@ -336,6 +379,25 @@ impl Session {
                 }
                 settings_screen::Outcome::Controls => {
                     self.controls_screen = Some(ControlsScreen::new(&self.controls));
+                    return false;
+                }
+                settings_screen::Outcome::SaveState => {
+                    let result = self.save_current_state();
+                    self.update_state_screen(result, "STATE SAVED");
+                    return false;
+                }
+                settings_screen::Outcome::DeleteState => {
+                    let result = self.delete_current_state();
+                    self.update_state_screen(result, "STATE DELETED");
+                    return false;
+                }
+                settings_screen::Outcome::LoadState => {
+                    let result = self.load_current_state();
+                    if result.is_ok() {
+                        self.settings_screen = None;
+                    } else {
+                        self.update_state_screen(result, "STATE LOADED");
+                    }
                     return false;
                 }
             }
@@ -827,7 +889,7 @@ mod tests {
             settings: true,
             ..Default::default()
         });
-        let rows = crate::settings_screen::SettingsScreen::new(true);
+        let rows = crate::settings_screen::SettingsScreen::new(true, StateInfo::default());
         let mut overlay = rows;
         overlay.selection = 9;
         session.settings_screen = Some(overlay);
@@ -860,6 +922,53 @@ mod tests {
             ..Default::default()
         }));
         assert!(matches!(session.screen, Screen::Menu));
+    }
+
+    #[test]
+    fn emulator_settings_save_load_and_delete_the_manual_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut session = Session::new(Records::default(), Settings::default());
+        session.set_emulator_paths(PathBuf::from("app"), directory.path().to_path_buf());
+        session.refresh_catalog();
+        let index = session
+            .catalog
+            .iter()
+            .position(|entry| {
+                entry.kind() == GameKind::Nes && entry.rom().is_some_and(|rom| rom.builtin)
+            })
+            .unwrap();
+        session.selected = index;
+        session.launch_selected();
+        assert!(session.state_info().supported);
+
+        session.open_settings();
+        session.settings_screen.as_mut().unwrap().selection = 1;
+        assert!(!session.tick(Input {
+            confirm: true,
+            ..Default::default()
+        }));
+        let state = std::fs::read_dir(directory.path().join("emulators/nes"))
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.path())
+            .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("state"))
+            .expect("manual save state");
+        assert!(state.is_file());
+
+        session.settings_screen.as_mut().unwrap().selection = 2;
+        assert!(!session.tick(Input {
+            confirm: true,
+            ..Default::default()
+        }));
+        assert!(session.settings_screen.is_none());
+
+        session.open_settings();
+        session.settings_screen.as_mut().unwrap().selection = 3;
+        assert!(!session.tick(Input {
+            confirm: true,
+            ..Default::default()
+        }));
+        assert!(!state.is_file());
     }
 
     #[test]

@@ -142,17 +142,11 @@ impl<S: EmulatorSystem> EmulatorGame<S> {
             self.save_dir.as_deref(),
             self.core_dir.as_deref(),
         )?;
-        if self.save_enabled {
-            if let Some(path) = self.sram_path(&entry)
-                && let Ok(data) = std::fs::read(path)
-            {
-                backend.set_sram(&data);
-            }
-            if let Some(path) = self.state_path(&entry)
-                && let Ok(data) = std::fs::read(path)
-            {
-                let _ = backend.load_state(&data);
-            }
+        if self.save_enabled
+            && let Some(path) = self.sram_path(&entry)
+            && let Ok(data) = std::fs::read(path)
+        {
+            backend.set_sram(&data);
         }
         self.backend = Some(backend);
         self.rom = Some(entry);
@@ -199,27 +193,64 @@ impl<S: EmulatorSystem> EmulatorGame<S> {
         }
     }
 
-    fn save_state(&mut self) {
+    pub fn state_supported(&self) -> bool {
+        self.save_enabled && self.running && self.backend.is_some()
+    }
+
+    pub fn state_available(&self) -> bool {
+        self.rom
+            .as_ref()
+            .and_then(|rom| self.state_path(rom))
+            .is_some_and(|path| path.is_file())
+    }
+
+    pub fn save_quick_state(&mut self) -> Result<(), String> {
+        if !self.state_supported() {
+            return Err("save states are not available for this game".into());
+        }
+        let rom = self.rom.clone().ok_or("no cartridge loaded")?;
+        let path = self
+            .state_path(&rom)
+            .ok_or("save-state directory unavailable")?;
+        let backend = self.backend.as_mut().ok_or("emulator not running")?;
+        let data = backend
+            .save_state()
+            .ok_or("this emulator could not create a save state")?;
+        atomic_write(&path, &data).map_err(|error| format!("cannot write save state: {error}"))
+    }
+
+    pub fn load_quick_state(&mut self) -> Result<(), String> {
+        if !self.state_supported() {
+            return Err("save states are not available for this game".into());
+        }
+        let rom = self.rom.clone().ok_or("no cartridge loaded")?;
+        let path = self
+            .state_path(&rom)
+            .ok_or("save-state directory unavailable")?;
+        let data =
+            std::fs::read(&path).map_err(|error| format!("cannot read save state: {error}"))?;
+        let backend = self.backend.as_mut().ok_or("emulator not running")?;
+        backend
+            .load_state(&data)
+            .then_some(())
+            .ok_or_else(|| "the emulator rejected this save state".to_owned())
+    }
+
+    pub fn delete_quick_state(&mut self) -> Result<(), String> {
         if !self.save_enabled {
-            return;
+            return Err("save states are not available for this game".into());
         }
         let Some(rom) = self.rom.clone() else {
-            return;
+            return Err("no cartridge loaded".into());
         };
         let Some(path) = self.state_path(&rom) else {
-            return;
+            return Err("save-state directory unavailable".into());
         };
-        let Some(backend) = self.backend.as_mut() else {
-            return;
-        };
-        if let Some(data) = backend.save_state() {
-            let _ = atomic_write(&path, &data);
-        }
+        std::fs::remove_file(&path).map_err(|error| format!("cannot delete save state: {error}"))
     }
 
     fn leave_running(&mut self) {
         self.save_sram();
-        self.save_state();
         if let Some(rom) = &self.rom
             && let Some(index) = self
                 .roms
@@ -295,7 +326,6 @@ impl<S: EmulatorSystem> ArcadeGame for EmulatorGame<S> {
     fn save(&mut self) {
         if self.running {
             self.save_sram();
-            self.save_state();
         }
     }
 
@@ -335,7 +365,6 @@ impl<S: EmulatorSystem> ArcadeGame for EmulatorGame<S> {
             self.paused = !self.paused;
             if self.paused {
                 self.save_sram();
-                self.save_state();
             }
             return;
         }

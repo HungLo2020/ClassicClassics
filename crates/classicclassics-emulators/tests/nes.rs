@@ -39,14 +39,34 @@ fn cartridge_starts_saves_state_and_leaves_the_machine() {
     for _ in 0..12 {
         game.tick(Input::default(), &mut Vec::new());
     }
+    let state = directory.path().join("save/nes/000000000000002a.state");
     game.save();
-    assert!(
-        directory
-            .path()
-            .join("save/nes/000000000000002a.state")
-            .is_file()
+    assert!(!state.is_file());
+    game.tick(
+        Input {
+            pause: true,
+            ..Default::default()
+        },
+        &mut Vec::new(),
     );
+    assert!(!state.is_file());
+    game.tick(
+        Input {
+            pause: true,
+            ..Default::default()
+        },
+        &mut Vec::new(),
+    );
+    assert!(game.state_supported());
+    assert!(!game.state_available());
+    game.save_quick_state().unwrap();
+    assert!(state.is_file());
+    assert!(game.state_available());
+    game.load_quick_state().unwrap();
+    game.delete_quick_state().unwrap();
+    assert!(!state.is_file());
     assert!(!game.back_to_picker());
+    assert!(!state.is_file());
     assert!(game.summary().contains("running=false"));
     game.picker.selected = 0;
     game.tick(

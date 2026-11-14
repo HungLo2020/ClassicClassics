@@ -47,6 +47,8 @@ const MENUS: &[&str] = &[
     controls::MENU_VERTICAL,
 ];
 const SYSTEM: &[&str] = &[
+    controls::START,
+    controls::SELECT,
     controls::PAUSE,
     controls::RESTART,
     controls::MODE,
@@ -93,6 +95,8 @@ pub fn action_label(action: &str) -> String {
         controls::ROTATE => "TURN LEFT / RIGHT",
         controls::P1 => "PADDLE 1 UP / DOWN",
         controls::P2 => "PADDLE 2 UP / DOWN",
+        controls::START => "EMULATOR START",
+        controls::SELECT => "EMULATOR SELECT",
         controls::MODE => "CHANGE GAME MODE",
         controls::CONFIRM => "SELECT / CONFIRM",
         controls::BACK => "BACK TO CATALOG",

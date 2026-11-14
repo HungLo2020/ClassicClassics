@@ -32,7 +32,7 @@ impl EmulatorSystem for NesSystem {
     fn controls_help(h: &ControlHints) -> String {
         format!(
             "MOVE {} - A:{} - B:{} - START:{} - SELECT:{} - ESC:{}",
-            h.move_x, h.fire, h.jump, h.confirm, h.mode, h.settings
+            h.move_x, h.fire, h.jump, h.start, h.select, h.settings
         )
     }
     fn motif(paint: &mut Paint, cx: f32, cy: f32, accent: Color) {
@@ -105,8 +105,8 @@ impl EmulatorSystem for GbaSystem {
             h.jump,
             h.shoulder_left,
             h.shoulder_right,
-            h.confirm,
-            h.mode,
+            h.start,
+            h.select,
             h.settings
         )
     }
@@ -123,7 +123,7 @@ impl EmulatorSystem for GbaSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BTN_A, BTN_B, BTN_L, BTN_LEFT, BTN_RIGHT};
+    use crate::{BTN_A, BTN_B, BTN_L, BTN_LEFT, BTN_RIGHT, BTN_SELECT, BTN_START};
 
     #[test]
     fn families_map_the_shared_input_to_their_own_buttons() {
@@ -145,6 +145,43 @@ mod tests {
         assert_eq!(atari & BTN_B, BTN_B);
         assert_eq!(atari & BTN_A, 0);
         assert_eq!(atari & BTN_LEFT, BTN_LEFT);
+    }
+
+    #[test]
+    fn start_and_select_do_not_ride_on_menu_confirm_or_mode() {
+        let menu_actions = Input {
+            jump: true,
+            confirm: true,
+            mode: true,
+            ..Default::default()
+        };
+        let families = [
+            NesSystem::buttons(&menu_actions),
+            SnesSystem::buttons(&menu_actions),
+            GbaSystem::buttons(&menu_actions),
+            Atari2600System::buttons(&menu_actions),
+        ];
+        for buttons in families {
+            assert_eq!(buttons[0] & BTN_START, 0);
+            assert_eq!(buttons[0] & BTN_SELECT, 0);
+        }
+        assert_eq!(NesSystem::buttons(&menu_actions)[0] & BTN_B, BTN_B);
+
+        let console = Input {
+            start: true,
+            select: true,
+            ..Default::default()
+        };
+        let families = [
+            NesSystem::buttons(&console),
+            SnesSystem::buttons(&console),
+            GbaSystem::buttons(&console),
+            Atari2600System::buttons(&console),
+        ];
+        for buttons in families {
+            assert_eq!(buttons[0] & BTN_START, BTN_START);
+            assert_eq!(buttons[0] & BTN_SELECT, BTN_SELECT);
+        }
     }
 }
 
@@ -176,7 +213,7 @@ impl EmulatorSystem for Atari2600System {
     fn controls_help(h: &ControlHints) -> String {
         format!(
             "MOVE {} - FIRE:{} - RESET:{} - SELECT:{} - ESC:{}",
-            h.move_x, h.fire, h.confirm, h.mode, h.settings
+            h.move_x, h.fire, h.start, h.select, h.settings
         )
     }
     fn buttons(input: &Input) -> [u16; 2] {
@@ -200,10 +237,10 @@ impl EmulatorSystem for Atari2600System {
         if input.fire {
             p1 |= crate::BTN_B;
         }
-        if input.confirm {
+        if input.start {
             p1 |= crate::BTN_START;
         }
-        if input.mode {
+        if input.select {
             p1 |= crate::BTN_SELECT;
         }
         let other = input.other_players[0];

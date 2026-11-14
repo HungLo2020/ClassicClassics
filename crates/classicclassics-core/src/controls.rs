@@ -2,6 +2,8 @@
 #[derive(Clone, Debug)]
 pub struct ControlHints {
     pub confirm: String,
+    pub start: String,
+    pub select: String,
     pub back: String,
     pub settings: String,
     pub menu_left: String,
@@ -30,6 +32,8 @@ impl Default for ControlHints {
     fn default() -> Self {
         Self {
             confirm: "ENTER".into(),
+            start: "ENTER".into(),
+            select: "TAB".into(),
             back: "BACKSPACE".into(),
             settings: "ESC".into(),
             menu_left: "A/LEFT".into(),

@@ -107,19 +107,25 @@ voice and flushes queued samples.
 ## Saves and records
 
 Battery-backed cartridge RAM is written to
-`data/save/emulators/<system>/<id>.srm`. Automatic save states are written to
-`.state` beside it when pausing, leaving for the picker/catalog, changing games,
-or exiting. Both use a same-directory temporary file, `sync_all` and rename.
+`data/save/emulators/<system>/<id>.srm`. It is ordinary cartridge behavior and
+saves automatically when pausing, leaving, changing games, or exiting. Writes
+use a same-directory temporary file, `sync_all` and rename.
 
-On starting a cartridge the adapter restores the battery file, then the save
-state if present. `--no-save` disables both reads and writes, along with the
-collection's records and settings. Each emulated game's catalog record shows the
-number of discovered cartridges; the persistent `Record` additionally keeps the
-last title and play time.
+Save states are **manual and emulator-only**. While a cartridge is running, open
+the Escape pause/settings overlay and choose **Save State**, **Load State** or
+**Delete State**. There is one quick-state slot per cartridge. Starting a
+cartridge restores only battery SRAM; it never loads `.state` automatically.
+Existing `.state` files from older builds are treated as the quick-slot contents
+and can be loaded explicitly.
+
+`--no-save` disables battery/state reads and writes along with the collection's
+records and settings. Each emulated game's catalog record shows the number of
+discovered cartridges; the persistent `Record` additionally keeps the last title
+and play time.
 
 Emulator machine state is deliberately not part of the JSON `--state` snapshot.
 The snapshot records the picker and selected cartridge identity; the binary
-`.state` file is the authoritative machine snapshot.
+`.state` file is the authoritative manual save-state slot.
 
 ## Controls
 
@@ -152,8 +158,11 @@ SNES  MOVE A/D - A:MOUSE1 - B:SPACE - X:X - Y:SHIFT - L:C - R:V - START:ENTER - 
 2600  MOVE A/D - FIRE:MOUSE1 - RESET:ENTER - SELECT:TAB - ESC:ESCAPE
 ```
 
-The `SELECT` row is the `mode` action (Tab by default); `START` is `confirm`
-(Enter); these can be changed in Settings → Controls.
+`START` and `SELECT` are dedicated emulator actions: Enter and Tab by default,
+with controller Start and left-stick click. They are deliberately separate from
+menu Confirm and game Mode, so Space (jump) and controller face buttons cannot
+pause a console by accident. Collection Pause is P / right-stick click and
+Restart is R / Mode (guide). All of them can be changed in Settings → Controls.
 
 ## Limits
 

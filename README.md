@@ -70,8 +70,8 @@ or freezes a running game. **Backspace** returns from a game to the catalog.
 | Thrust | W or Up | Triggers |
 | Hyperspace | Shift | West |
 | Pong mode | Tab | North |
-| Pause | P | Start |
-| Restart | R | Right stick click |
+| Pause | P | Right stick click |
+| Restart | R | Mode / guide |
 | Mute | M | — |
 | Fullscreen | F11 or Alt+Enter | — |
 | Filter / scaling | F2 / F3 | — |
@@ -109,8 +109,11 @@ into `app/games/<system>/roms/`. Extra cartridges are discovered, in order, from
 `data/roms/<system>`, `data/roms`, `rom_dirs` in
 `data/config/emulators.toml`, and repeatable `--rom-dir` arguments. `--rom PATH`
 starts one cartridge directly and is also used by headless verification.
-Cartridge battery files and automatic save states are written atomically to
-`data/save/emulators/<system>/<id>.srm` and `.state`.
+Cartridge battery files are written atomically to
+`data/save/emulators/<system>/<id>.srm`. Save states are manual: open the Escape
+pause/settings menu and choose **Save State**, **Load State** or **Delete State**
+while an emulated game is running. Starting a cartridge cold-boots from its
+battery file; it never loads a state automatically.
 
 ```sh
 cargo run -- --game snes --rom path/to/game.sfc
@@ -321,7 +324,7 @@ back to paths relative to the install root when run outside Basalt.
 │   └── games/<system>/        built-in ROM library and per-cartridge covers/
 └── data/
     ├── save/records.json      synced high scores and progress
-    ├── save/emulators/        cartridge battery files and automatic save states
+    ├── save/emulators/        cartridge battery files and manual save states
     ├── config/display.toml    machine-local window/audio settings
     ├── config/shared/controls.toml  portable bindings preset
     ├── config/emulators.toml  optional extra ROM directories

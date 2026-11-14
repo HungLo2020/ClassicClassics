@@ -1,4 +1,5 @@
 //! Register a game once here to connect catalog, CLI, dispatch and records.
+use crate::settings_screen::StateInfo;
 use classicclassics_core::{
     ArcadeGame, ControlHints, EmulatorAudio, GameInfo, GameLoadContext, Input, Sound, paint::Paint,
 };
@@ -142,6 +143,60 @@ games! {
     Snes => snes, snes, "10";
     Gba => gba, gba, "11";
     Atari2600 => atari2600, atari2600, "12";
+}
+
+impl Game {
+    pub fn state_info(&self) -> StateInfo {
+        match self {
+            Self::Nes(game) => StateInfo {
+                supported: game.state_supported(),
+                has_state: game.state_available(),
+            },
+            Self::Snes(game) => StateInfo {
+                supported: game.state_supported(),
+                has_state: game.state_available(),
+            },
+            Self::Gba(game) => StateInfo {
+                supported: game.state_supported(),
+                has_state: game.state_available(),
+            },
+            Self::Atari2600(game) => StateInfo {
+                supported: game.state_supported(),
+                has_state: game.state_available(),
+            },
+            _ => StateInfo::default(),
+        }
+    }
+
+    pub fn save_state(&mut self) -> Result<(), String> {
+        match self {
+            Self::Nes(game) => game.save_quick_state(),
+            Self::Snes(game) => game.save_quick_state(),
+            Self::Gba(game) => game.save_quick_state(),
+            Self::Atari2600(game) => game.save_quick_state(),
+            _ => Err("save states are only available for emulated games".into()),
+        }
+    }
+
+    pub fn load_state(&mut self) -> Result<(), String> {
+        match self {
+            Self::Nes(game) => game.load_quick_state(),
+            Self::Snes(game) => game.load_quick_state(),
+            Self::Gba(game) => game.load_quick_state(),
+            Self::Atari2600(game) => game.load_quick_state(),
+            _ => Err("save states are only available for emulated games".into()),
+        }
+    }
+
+    pub fn delete_state(&mut self) -> Result<(), String> {
+        match self {
+            Self::Nes(game) => game.delete_quick_state(),
+            Self::Snes(game) => game.delete_quick_state(),
+            Self::Gba(game) => game.delete_quick_state(),
+            Self::Atari2600(game) => game.delete_quick_state(),
+            _ => Err("save states are only available for emulated games".into()),
+        }
+    }
 }
 
 impl GameKind {
