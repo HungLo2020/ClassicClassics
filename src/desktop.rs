@@ -358,9 +358,12 @@ fn build_input(keyboard: &InputState, gamepad: &InputState, stick: &mut StickNav
         jump_pressed: merged_action(keyboard, gamepad, controls::JUMP).pressed,
         secondary: merged_action(keyboard, gamepad, controls::HYPERSPACE).held(),
         secondary_pressed: merged_action(keyboard, gamepad, controls::HYPERSPACE).pressed,
-        shoulder_left: merged_action(keyboard, gamepad, controls::SHOULDER_LEFT).held(),
-        shoulder_right: merged_action(keyboard, gamepad, controls::SHOULDER_RIGHT).held(),
-        aux: merged_action(keyboard, gamepad, controls::AUX).held(),
+        emu_a: merged_action(keyboard, gamepad, controls::EMU_A).held(),
+        emu_b: merged_action(keyboard, gamepad, controls::EMU_B).held(),
+        emu_x: merged_action(keyboard, gamepad, controls::EMU_X).held(),
+        emu_y: merged_action(keyboard, gamepad, controls::EMU_Y).held(),
+        emu_l: merged_action(keyboard, gamepad, controls::EMU_L).held(),
+        emu_r: merged_action(keyboard, gamepad, controls::EMU_R).held(),
         other_players: [Default::default(); 3],
         pointer: None,
         ui_pointer: None,
@@ -834,9 +837,12 @@ impl App {
                     jump: pad.action(controls::JUMP).held() || pad.action(controls::JUMP).pressed,
                     secondary: pad.action(controls::HYPERSPACE).held()
                         || pad.action(controls::HYPERSPACE).pressed,
-                    shoulder_left: pad.action(controls::SHOULDER_LEFT).held(),
-                    shoulder_right: pad.action(controls::SHOULDER_RIGHT).held(),
-                    aux: pad.action(controls::AUX).held(),
+                    emu_a: pad.action(controls::EMU_A).held(),
+                    emu_b: pad.action(controls::EMU_B).held(),
+                    emu_x: pad.action(controls::EMU_X).held(),
+                    emu_y: pad.action(controls::EMU_Y).held(),
+                    emu_l: pad.action(controls::EMU_L).held(),
+                    emu_r: pad.action(controls::EMU_R).held(),
                 };
                 if slot == 1 {
                     state.x = axis(
@@ -853,6 +859,9 @@ impl App {
                         || self.keyboard.action(controls::P2_JUMP).pressed;
                     state.secondary |= self.keyboard.action(controls::P2_SECONDARY).held()
                         || self.keyboard.action(controls::P2_SECONDARY).pressed;
+                    state.emu_a |= self.keyboard.action(controls::P2_FIRE).held();
+                    state.emu_b |= self.keyboard.action(controls::P2_JUMP).held();
+                    state.emu_y |= self.keyboard.action(controls::P2_SECONDARY).held();
                 }
                 input.other_players[index] = state;
             }

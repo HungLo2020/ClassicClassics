@@ -129,40 +129,43 @@ The snapshot records the picker and selected cartridge identity; the binary
 
 ## Controls
 
-The shared control preset gains `shoulder_left` (C / LB) and `shoulder_right`
-(V / RB). Face buttons map as follows:
+Emulator buttons are a dedicated action set, separate from native Fire/Jump/
+Secondary. The keyboard layout is a left-hand movement, right-hand face-button
+cluster:
 
-| Action | Emulator button |
-|---|---|
-| Fire | A (Atari 2600: joystick fire) |
-| Jump | B |
-| Secondary | X / Y depending on family |
-| Hyperspace | X |
-| Confirm | Start |
-| Mode | Select |
-| Movement | D-pad or left stick |
+| Action | Keyboard | Controller |
+|---|---|---|
+| Movement | WASD or arrows | D-pad or left stick |
+| A | K | East |
+| B | J | South |
+| X | I | North |
+| Y | U | West |
+| L / R | C / V | LB / RB |
+| Start | Enter | Start |
+| Select | Tab | Select |
+| Settings | Escape | Start + Select |
+| Back to catalog | Backspace | Left stick click |
+| Pause | P | Right stick click |
+| Restart | R | Mode / guide |
 
-Player two uses the second controller slot and the existing player-two keyboard
-bindings. Enter/Backspace/P/R/Escape keep their collection meanings; Backspace
-leaves a running cartridge and returns directly to the catalog. The cartridge
-picker remains available when a system is launched explicitly with
-`--game nes` (or `--game snes`, etc.).
+The controller face buttons follow the Nintendo diamond; NES uses B/A, GBA uses
+B/A/L/R, SNES uses B/A/Y/X/L/R, and Atari 2600 uses B as its single fire button.
+Unused buttons are ignored per family. Player two uses the second controller
+slot; the keyboard player-two bindings also map to the emulator A/B/Y buttons.
 
-The picker and the running game render the active mapping rather than only a
-generic "jump/fire" hint. Examples:
+The picker and the running game render the active mapping. Examples:
 
 ```text
-NES   MOVE A/D - A:MOUSE1 - B:SPACE - START:ENTER - SELECT:TAB - ESC:ESCAPE
-GBA   MOVE A/D - A:MOUSE1 - B:SPACE - L:C - R:V - START:ENTER - SELECT:TAB - ESC:ESCAPE
-SNES  MOVE A/D - A:MOUSE1 - B:SPACE - X:X - Y:SHIFT - L:C - R:V - START:ENTER - SELECT:TAB - ESC:ESCAPE
-2600  MOVE A/D - FIRE:MOUSE1 - RESET:ENTER - SELECT:TAB - ESC:ESCAPE
+NES   MOVE A/D - A:K - B:J - START:ENTER - SELECT:TAB - ESC:ESCAPE
+GBA   MOVE A/D - A:K - B:J - L:C - R:V - START:ENTER - SELECT:TAB - ESC:ESCAPE
+SNES  MOVE A/D - A:K - B:J - X:I - Y:U - L:C - R:V - START:ENTER - SELECT:TAB - ESC:ESCAPE
+2600  MOVE A/D - FIRE:J - RESET:ENTER - SELECT:TAB - ESC:ESCAPE
 ```
 
-`START` and `SELECT` are dedicated emulator actions: Enter and Tab by default,
-with controller Start and left-stick click. They are deliberately separate from
-menu Confirm and game Mode, so Space (jump) and controller face buttons cannot
-pause a console by accident. Collection Pause is P / right-stick click and
-Restart is R / Mode (guide). All of them can be changed in Settings → Controls.
+`START` and `SELECT` are dedicated emulator actions. They are deliberately
+separate from menu Confirm and native Mode, so Space (native jump) and controller
+face buttons cannot start/pause a console by accident. All actions can be changed
+under Settings → Controls → Emulator.
 
 ## Limits
 

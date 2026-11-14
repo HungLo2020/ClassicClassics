@@ -55,16 +55,21 @@ or freezes a running game. **Backspace** returns from a game to the catalog.
 |---|---|---|
 | Navigate catalog | W/S/A/D or arrows | D-pad or left stick |
 | Confirm | Enter or Space | South |
-| Settings | Escape | East |
-| Back to catalog | Backspace | Select |
+| Settings | Escape | Start + Select |
+| Back to catalog | Backspace | Left stick click |
 | Pong paddles | W/S, arrows in two-player | Left/right stick |
 | Imported game movement / aim | WASD; mouse aim in Missile Command | D-pad or left stick |
 | Imported primary fire | Left mouse | South / RT |
 | Jump / right missile battery | Space or middle mouse | North |
 | Grenade / left missile battery | Shift or right mouse | West |
+| Emulator movement | WASD or arrows | D-pad or left stick |
+| Emulator A | K | East |
+| Emulator B | J | South |
+| Emulator X | I | North |
+| Emulator Y | U | West |
 | Emulator L / R | C / V | LB / RB |
-| Emulator X | X | C |
-| Emulated system face buttons | Left mouse / Space / Shift / Tab | A / B / X / Y, Start, Select |
+| Emulator Start | Enter | Start |
+| Emulator Select | Tab | Select |
 | Imported player two | Arrows; Numpad 0 fire, 1 jump, 2 grenade | Second controller |
 | Rotate ship / lander | A/D or Left/Right | Left stick |
 | Thrust | W or Up | Triggers |
@@ -87,9 +92,11 @@ straight to the catalog. **P** pauses, **R** resets the console, and the shared
 Settings overlay still freezes the machine.
 
 The picker and the running game both show the active mapping, for example
-`A:MOUSE1 - B:SPACE - START:ENTER - SELECT:TAB` for NES and
-`A:MOUSE1 - B:SPACE - X:X - Y:SHIFT - L:C - R:V - START:ENTER - SELECT:TAB`
-for Super Nintendo. The same actions are editable in Settings → Controls.
+`A:K - B:J - START:ENTER - SELECT:TAB` for NES and
+`A:K - B:J - X:I - Y:U - L:C - R:V - START:ENTER - SELECT:TAB` for Super
+Nintendo. The same actions are editable under **Settings → Controls → Emulator**.
+On a controller, Start and Select are the console buttons; Start+Select opens
+Settings, L3 returns to the catalog, R3 pauses and Mode restarts.
 
 The release always contains the pinned cores in `app/cores/`:
 

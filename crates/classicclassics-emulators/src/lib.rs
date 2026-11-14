@@ -47,66 +47,65 @@ pub trait EmulatorSystem: Default + Clone + Copy + std::fmt::Debug + Send + 'sta
         format!(
             "MOVE {} - A:{} - B:{} - X:{} - Y:{} - L:{} - R:{} - START:{} - SELECT:{} - ESC:{}",
             h.move_x,
-            h.fire,
-            h.jump,
-            h.aux,
-            h.hyperspace,
-            h.shoulder_left,
-            h.shoulder_right,
+            h.emu_a,
+            h.emu_b,
+            h.emu_x,
+            h.emu_y,
+            h.emu_l,
+            h.emu_r,
             h.start,
             h.select,
             h.settings
         )
     }
     fn buttons(input: &Input) -> [u16; 2] {
-        let map =
-            |fire, jump, secondary, aux, shoulder_left, shoulder_right, start, select, x, y| {
-                let mut buttons = 0;
-                if x < 0 {
-                    buttons |= BTN_LEFT;
-                }
-                if x > 0 {
-                    buttons |= BTN_RIGHT;
-                }
-                if y < 0 {
-                    buttons |= BTN_UP;
-                }
-                if y > 0 {
-                    buttons |= BTN_DOWN;
-                }
-                if fire {
-                    buttons |= BTN_A;
-                }
-                if jump {
-                    buttons |= BTN_B;
-                }
-                if secondary {
-                    buttons |= BTN_Y;
-                }
-                if aux {
-                    buttons |= BTN_X;
-                }
-                if shoulder_left {
-                    buttons |= BTN_L;
-                }
-                if shoulder_right {
-                    buttons |= BTN_R;
-                }
-                if start {
-                    buttons |= BTN_START;
-                }
-                if select {
-                    buttons |= BTN_SELECT;
-                }
-                buttons
-            };
+        let map = |a, b, x, y, l, r, start, select, axis_x, axis_y| {
+            let mut buttons = 0;
+            if axis_x < 0 {
+                buttons |= BTN_LEFT;
+            }
+            if axis_x > 0 {
+                buttons |= BTN_RIGHT;
+            }
+            if axis_y < 0 {
+                buttons |= BTN_UP;
+            }
+            if axis_y > 0 {
+                buttons |= BTN_DOWN;
+            }
+            if a {
+                buttons |= BTN_A;
+            }
+            if b {
+                buttons |= BTN_B;
+            }
+            if x {
+                buttons |= BTN_X;
+            }
+            if y {
+                buttons |= BTN_Y;
+            }
+            if l {
+                buttons |= BTN_L;
+            }
+            if r {
+                buttons |= BTN_R;
+            }
+            if start {
+                buttons |= BTN_START;
+            }
+            if select {
+                buttons |= BTN_SELECT;
+            }
+            buttons
+        };
         let p1 = map(
-            input.fire,
-            input.jump,
-            input.secondary,
-            input.aux,
-            input.shoulder_left,
-            input.shoulder_right,
+            input.emu_a,
+            input.emu_b,
+            input.emu_x,
+            input.emu_y,
+            input.emu_l,
+            input.emu_r,
             input.start,
             input.select,
             input.move_x,
@@ -114,12 +113,12 @@ pub trait EmulatorSystem: Default + Clone + Copy + std::fmt::Debug + Send + 'sta
         );
         let other = input.other_players[0];
         let p2 = map(
-            other.fire,
-            other.jump,
-            other.secondary,
-            other.aux,
-            other.shoulder_left,
-            other.shoulder_right,
+            other.emu_a,
+            other.emu_b,
+            other.emu_x,
+            other.emu_y,
+            other.emu_l,
+            other.emu_r,
             false,
             false,
             other.x,

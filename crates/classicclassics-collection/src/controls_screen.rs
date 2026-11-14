@@ -15,18 +15,27 @@ const WIDTH: f32 = 960.0;
 const HEIGHT: f32 = 600.0;
 const TABLE_TOP: f32 = 70.0;
 const ROW_HEIGHT: f32 = 26.0;
+const TAB_PITCH: f32 = 168.0;
+const TAB_WIDTH: f32 = 156.0;
 const GAMEPLAY: &[&str] = &[
     controls::FIRE,
     controls::JUMP,
-    controls::SHOULDER_LEFT,
-    controls::SHOULDER_RIGHT,
-    controls::AUX,
     controls::MOVE_HORIZONTAL,
     controls::MOVE_VERTICAL,
     controls::THRUST,
     controls::ROTATE,
     controls::P1,
     controls::HYPERSPACE,
+];
+const EMULATOR: &[&str] = &[
+    controls::EMU_A,
+    controls::EMU_B,
+    controls::EMU_X,
+    controls::EMU_Y,
+    controls::EMU_L,
+    controls::EMU_R,
+    controls::START,
+    controls::SELECT,
 ];
 const LOCAL_PLAYERS: &[&str] = &[
     controls::P2_HORIZONTAL,
@@ -47,8 +56,6 @@ const MENUS: &[&str] = &[
     controls::MENU_VERTICAL,
 ];
 const SYSTEM: &[&str] = &[
-    controls::START,
-    controls::SELECT,
     controls::PAUSE,
     controls::RESTART,
     controls::MODE,
@@ -58,8 +65,9 @@ const SYSTEM: &[&str] = &[
     controls::MUTE,
     controls::QUIT,
 ];
-const GROUPS: [(&str, &[&str]); 4] = [
+const GROUPS: [(&str, &[&str]); 5] = [
     ("GAMEPLAY", GAMEPLAY),
+    ("EMULATOR", EMULATOR),
     ("MENUS", MENUS),
     ("SYSTEM", SYSTEM),
     ("PLAYER 2", LOCAL_PLAYERS),
@@ -83,9 +91,12 @@ pub fn action_label(action: &str) -> String {
         controls::MOVE_HORIZONTAL => "MOVE LEFT / RIGHT",
         controls::MOVE_VERTICAL => "MOVE UP / DOWN",
         controls::JUMP => "JUMP / RIGHT BATTERY",
-        controls::SHOULDER_LEFT => "SHOULDER L",
-        controls::SHOULDER_RIGHT => "SHOULDER R",
-        controls::AUX => "EMULATOR X",
+        controls::EMU_A => "EMULATOR A",
+        controls::EMU_B => "EMULATOR B",
+        controls::EMU_Y => "EMULATOR Y",
+        controls::EMU_X => "EMULATOR X",
+        controls::EMU_L => "EMULATOR L",
+        controls::EMU_R => "EMULATOR R",
         controls::P2_HORIZONTAL => "PLAYER 2 LEFT / RIGHT",
         controls::P2_FIRE => "PLAYER 2 FIRE",
         controls::P2_JUMP => "PLAYER 2 JUMP",
@@ -390,7 +401,7 @@ impl ControlsScreen {
                     text: UiText::literal(label),
                     action: Some(ActionId(10 + index as u64)),
                 },
-                Rect::new(index as f32 * 176.0, 0.0, 164.0, 30.0),
+                Rect::new(index as f32 * TAB_PITCH, 0.0, TAB_WIDTH, 30.0),
             ));
         }
         for (x, label) in [
@@ -763,7 +774,13 @@ impl ControlsScreen {
         canvas.set_clip(None);
         let mut paint = Paint::over(canvas);
         paint.fit_view(960, 600);
-        paint.rect(48.0 + self.group as f32 * 176.0, 130.0, 164.0, 3.0, CYAN);
+        paint.rect(
+            48.0 + self.group as f32 * TAB_PITCH,
+            130.0,
+            TAB_WIDTH,
+            3.0,
+            CYAN,
+        );
         paint.text(
             48.0,
             462.0,
@@ -1029,8 +1046,8 @@ mod tests {
     fn mouse_clicks_choose_categories_and_bindings_with_scaled_coordinates() {
         let mut controls = Controls::default();
         let mut screen = ControlsScreen::new(&controls);
-        assert!(!click(&mut screen, &mut controls, 240.0, 115.0));
-        assert_eq!(screen.group, 1);
+        assert!(!click(&mut screen, &mut controls, 400.0, 115.0));
+        assert_eq!(screen.group, 2);
         let point =
             ControlsScreen::pointer_position((1920, 1080), (96.0 + 450.0 * 1.8, 185.0 * 1.8));
         assert!((point.x - 450.0).abs() < 0.001 && (point.y - 185.0).abs() < 0.001);
@@ -1059,14 +1076,16 @@ mod tests {
             },
             &mut controls,
         );
-        screen.tick(
-            Input {
-                menu_right: true,
-                ..Default::default()
-            },
-            &mut controls,
-        );
-        assert_eq!(screen.group, 1);
+        for _ in 0..2 {
+            screen.tick(
+                Input {
+                    menu_right: true,
+                    ..Default::default()
+                },
+                &mut controls,
+            );
+        }
+        assert_eq!(screen.group, 2);
         screen.tick(
             Input {
                 menu_down: true,

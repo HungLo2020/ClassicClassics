@@ -27,9 +27,15 @@ pub const P2_FIRE: &str = "p2_fire";
 pub const P2_JUMP: &str = "p2_jump";
 pub const P2_SECONDARY: &str = "p2_secondary";
 pub const FIRE: &str = "fire";
+pub const EMU_A: &str = "emu_a";
+pub const EMU_B: &str = "emu_b";
+pub const EMU_Y: &str = "emu_y";
 pub const SHOULDER_LEFT: &str = "shoulder_left";
 pub const SHOULDER_RIGHT: &str = "shoulder_right";
 pub const AUX: &str = "aux";
+pub const EMU_X: &str = AUX;
+pub const EMU_L: &str = SHOULDER_LEFT;
+pub const EMU_R: &str = SHOULDER_RIGHT;
 pub const HYPERSPACE: &str = "hyperspace";
 pub const PAUSE: &str = "pause";
 pub const RESTART: &str = "restart";
@@ -43,7 +49,7 @@ pub const SCALE: &str = "scale";
 pub const MENU_HORIZONTAL: &str = "menu_horizontal";
 pub const MENU_VERTICAL: &str = "menu_vertical";
 
-pub const ACTIONS: [&str; 35] = [
+pub const ACTIONS: [&str; 38] = [
     MENU_UP,
     MENU_DOWN,
     MENU_LEFT,
@@ -59,9 +65,12 @@ pub const ACTIONS: [&str; 35] = [
     THRUST,
     FIRE,
     JUMP,
+    EMU_A,
+    EMU_B,
+    EMU_Y,
     SHOULDER_LEFT,
     SHOULDER_RIGHT,
-    AUX,
+    EMU_X,
     MOVE_HORIZONTAL,
     MOVE_VERTICAL,
     P2_HORIZONTAL,
@@ -126,6 +135,12 @@ impl Default for Controls {
                 },
             )
             .bind(JUMP, Binding::gamepad_button(GamepadButton::North))
+            .bind(EMU_A, Binding::key(Key::KeyK))
+            .bind(EMU_A, Binding::gamepad_button(GamepadButton::East))
+            .bind(EMU_B, Binding::key(Key::KeyJ))
+            .bind(EMU_B, Binding::gamepad_button(GamepadButton::South))
+            .bind(EMU_Y, Binding::key(Key::KeyU))
+            .bind(EMU_Y, Binding::gamepad_button(GamepadButton::West))
             .bind(SHOULDER_LEFT, Binding::key(Key::KeyC))
             .bind(
                 SHOULDER_LEFT,
@@ -136,8 +151,8 @@ impl Default for Controls {
                 SHOULDER_RIGHT,
                 Binding::gamepad_button(GamepadButton::RightBumper),
             )
-            .bind(AUX, Binding::key(Key::KeyX))
-            .bind(AUX, Binding::gamepad_button(GamepadButton::C))
+            .bind(EMU_X, Binding::key(Key::KeyI))
+            .bind(EMU_X, Binding::gamepad_button(GamepadButton::North))
             .bind(
                 P2_HORIZONTAL,
                 Binding::axis(Key::ArrowLeft, Key::ArrowRight),
@@ -168,11 +183,19 @@ impl Default for Controls {
             .bind(START, Binding::key(Key::NumpadEnter))
             .bind(START, Binding::gamepad_button(GamepadButton::Start))
             .bind(SELECT, Binding::key(Key::Tab))
-            .bind(SELECT, Binding::gamepad_button(GamepadButton::LeftStick))
+            .bind(SELECT, Binding::gamepad_button(GamepadButton::Select))
             .bind(BACK, Binding::key(Key::Backspace))
-            .bind(BACK, Binding::gamepad_button(GamepadButton::Select))
+            .bind(BACK, Binding::gamepad_button(GamepadButton::LeftStick))
             .bind(SETTINGS, Binding::key(Key::Escape))
-            .bind(SETTINGS, Binding::gamepad_button(GamepadButton::East))
+            .bind(
+                SETTINGS,
+                Binding::Chord {
+                    buttons: vec![
+                        Button::Gamepad(GamepadButton::Start),
+                        Button::Gamepad(GamepadButton::Select),
+                    ],
+                },
+            )
             .bind(P1, Binding::axis(Key::KeyW, Key::KeyS))
             .bind(P1, Binding::gamepad_axis(GamepadAxis::LeftStickY))
             .bind(P2, Binding::axis(Key::ArrowUp, Key::ArrowDown))
@@ -296,6 +319,9 @@ impl Controls {
             MOVE_HORIZONTAL,
             MOVE_VERTICAL,
             JUMP,
+            EMU_A,
+            EMU_B,
+            EMU_Y,
             SHOULDER_LEFT,
             SHOULDER_RIGHT,
             AUX,
@@ -334,6 +360,48 @@ impl Controls {
                 if !values.contains(&new) {
                     values.push(new);
                 }
+            }
+        }
+        let replace = |values: &mut Vec<Binding>, old: Binding, new: Binding| {
+            if values.contains(&old) && !values.contains(&new) {
+                values.retain(|value| *value != old);
+                values.push(new);
+            }
+        };
+        let settings_chord = Binding::Chord {
+            buttons: vec![
+                Button::Gamepad(GamepadButton::Start),
+                Button::Gamepad(GamepadButton::Select),
+            ],
+        };
+        if let Some(values) = controls.bindings.actions.get_mut(SETTINGS) {
+            replace(
+                values,
+                Binding::gamepad_button(GamepadButton::East),
+                settings_chord,
+            );
+        }
+        if let Some(values) = controls.bindings.actions.get_mut(BACK) {
+            replace(
+                values,
+                Binding::gamepad_button(GamepadButton::Select),
+                Binding::gamepad_button(GamepadButton::LeftStick),
+            );
+        }
+        if let Some(values) = controls.bindings.actions.get_mut(SELECT) {
+            replace(
+                values,
+                Binding::gamepad_button(GamepadButton::LeftStick),
+                Binding::gamepad_button(GamepadButton::Select),
+            );
+        }
+        if let Some(values) = controls.bindings.actions.get_mut(AUX) {
+            let old = Binding::key(Key::KeyX);
+            let old_pad = Binding::gamepad_button(GamepadButton::C);
+            if values.contains(&old) && values.contains(&old_pad) {
+                values.retain(|value| *value != old && *value != old_pad);
+                values.push(Binding::key(Key::KeyI));
+                values.push(Binding::gamepad_button(GamepadButton::North));
             }
         }
         controls.validate()?;
@@ -427,9 +495,12 @@ impl Controls {
             thrust: label(THRUST),
             fire: label(FIRE),
             jump: label(JUMP),
-            shoulder_left: label(SHOULDER_LEFT),
-            shoulder_right: label(SHOULDER_RIGHT),
-            aux: label(AUX),
+            emu_a: label(EMU_A),
+            emu_b: label(EMU_B),
+            emu_x: label(EMU_X),
+            emu_y: label(EMU_Y),
+            emu_l: label(EMU_L),
+            emu_r: label(EMU_R),
             hyperspace: label(HYPERSPACE),
             pause: label(PAUSE),
             restart: label(RESTART),
@@ -568,6 +639,71 @@ mod tests {
         std::fs::write(&path, "version = 99").unwrap();
         assert!(!Controls::load_saved(&path).1);
         assert_eq!(std::fs::read_to_string(path).unwrap(), "version = 99");
+    }
+
+    #[test]
+    fn old_emulator_system_bindings_migrate_without_touching_native_actions() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("controls.toml");
+        let mut controls = Controls::default();
+        controls.bindings.actions.insert(
+            SETTINGS.into(),
+            vec![
+                Binding::key(Key::Escape),
+                Binding::gamepad_button(GamepadButton::East),
+            ],
+        );
+        controls.bindings.actions.insert(
+            BACK.into(),
+            vec![
+                Binding::key(Key::Backspace),
+                Binding::gamepad_button(GamepadButton::Select),
+            ],
+        );
+        controls.bindings.actions.insert(
+            SELECT.into(),
+            vec![
+                Binding::key(Key::Tab),
+                Binding::gamepad_button(GamepadButton::LeftStick),
+            ],
+        );
+        controls.bindings.actions.insert(
+            AUX.into(),
+            vec![
+                Binding::key(Key::KeyX),
+                Binding::gamepad_button(GamepadButton::C),
+            ],
+        );
+        controls.save(&path).unwrap();
+        let loaded = Controls::load(&path).unwrap();
+        let settings = &loaded.bindings.actions[SETTINGS];
+        assert!(!settings.contains(&Binding::gamepad_button(GamepadButton::East)));
+        assert!(settings.contains(&Binding::Chord {
+            buttons: vec![
+                Button::Gamepad(GamepadButton::Start),
+                Button::Gamepad(GamepadButton::Select),
+            ],
+        }));
+        assert!(
+            loaded.bindings.actions[BACK]
+                .contains(&Binding::gamepad_button(GamepadButton::LeftStick))
+        );
+        assert!(
+            loaded.bindings.actions[SELECT]
+                .contains(&Binding::gamepad_button(GamepadButton::Select))
+        );
+        assert!(loaded.bindings.actions[AUX].contains(&Binding::key(Key::KeyI)));
+        assert!(
+            loaded.bindings.actions[AUX].contains(&Binding::gamepad_button(GamepadButton::North))
+        );
+        assert_eq!(
+            loaded.bindings.actions[JUMP],
+            Controls::default().bindings.actions[JUMP]
+        );
+        assert_eq!(
+            loaded.bindings.actions[FIRE],
+            Controls::default().bindings.actions[FIRE]
+        );
     }
 
     #[test]

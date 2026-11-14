@@ -413,10 +413,10 @@ impl<S: EmulatorSystem> ArcadeGame for EmulatorGame<S> {
     fn autoplay(&self) -> Input {
         if self.running {
             Input {
-                fire: true,
-                jump: self.ticks % 90 < 45,
+                emu_a: true,
+                emu_b: self.ticks % 90 < 45,
                 move_x: if self.ticks % 240 < 120 { 1 } else { -1 },
-                confirm: S::autoplay_confirm(self.ticks),
+                start: S::autoplay_confirm(self.ticks),
                 ..Default::default()
             }
         } else {

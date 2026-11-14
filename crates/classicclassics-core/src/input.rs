@@ -22,11 +22,13 @@ pub struct Input {
     pub jump_pressed: bool,
     pub secondary: bool,
     pub secondary_pressed: bool,
-    /// Emulated systems' shoulder buttons.
-    pub shoulder_left: bool,
-    pub shoulder_right: bool,
-    /// Emulated systems' extra face button (SNES X).
-    pub aux: bool,
+    /// Emulated systems' face buttons and shoulders.
+    pub emu_a: bool,
+    pub emu_b: bool,
+    pub emu_x: bool,
+    pub emu_y: bool,
+    pub emu_l: bool,
+    pub emu_r: bool,
     /// Other local players (controller slots 2..4, keyboard player two).
     pub other_players: [PlayerControls; 3],
     /// Pointer position in the shared 960x600 logical game view, when moved.
@@ -58,9 +60,12 @@ pub struct PlayerControls {
     pub fire: bool,
     pub jump: bool,
     pub secondary: bool,
-    pub shoulder_left: bool,
-    pub shoulder_right: bool,
-    pub aux: bool,
+    pub emu_a: bool,
+    pub emu_b: bool,
+    pub emu_x: bool,
+    pub emu_y: bool,
+    pub emu_l: bool,
+    pub emu_r: bool,
 }
 impl Input {
     /// Preserve taps between original video frames while updating held inputs.
@@ -77,9 +82,12 @@ impl Input {
             current.fire |= previous.fire;
             current.jump |= previous.jump;
             current.secondary |= previous.secondary;
-            current.shoulder_left |= previous.shoulder_left;
-            current.shoulder_right |= previous.shoulder_right;
-            current.aux |= previous.aux;
+            current.emu_a |= previous.emu_a;
+            current.emu_b |= previous.emu_b;
+            current.emu_x |= previous.emu_x;
+            current.emu_y |= previous.emu_y;
+            current.emu_l |= previous.emu_l;
+            current.emu_r |= previous.emu_r;
         }
     }
 }

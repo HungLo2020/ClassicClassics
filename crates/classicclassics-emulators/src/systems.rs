@@ -32,7 +32,7 @@ impl EmulatorSystem for NesSystem {
     fn controls_help(h: &ControlHints) -> String {
         format!(
             "MOVE {} - A:{} - B:{} - START:{} - SELECT:{} - ESC:{}",
-            h.move_x, h.fire, h.jump, h.start, h.select, h.settings
+            h.move_x, h.emu_a, h.emu_b, h.start, h.select, h.settings
         )
     }
     fn motif(paint: &mut Paint, cx: f32, cy: f32, accent: Color) {
@@ -100,14 +100,7 @@ impl EmulatorSystem for GbaSystem {
     fn controls_help(h: &ControlHints) -> String {
         format!(
             "MOVE {} - A:{} - B:{} - L:{} - R:{} - START:{} - SELECT:{} - ESC:{}",
-            h.move_x,
-            h.fire,
-            h.jump,
-            h.shoulder_left,
-            h.shoulder_right,
-            h.start,
-            h.select,
-            h.settings
+            h.move_x, h.emu_a, h.emu_b, h.emu_l, h.emu_r, h.start, h.select, h.settings
         )
     }
     fn motif(paint: &mut Paint, cx: f32, cy: f32, accent: Color) {
@@ -129,10 +122,10 @@ mod tests {
     fn families_map_the_shared_input_to_their_own_buttons() {
         let input = Input {
             move_x: -1,
-            fire: true,
-            jump: true,
-            shoulder_left: true,
-            shoulder_right: true,
+            emu_a: true,
+            emu_b: true,
+            emu_l: true,
+            emu_r: true,
             ..Default::default()
         };
         let snes = SnesSystem::buttons(&input)[0];
@@ -165,7 +158,8 @@ mod tests {
             assert_eq!(buttons[0] & BTN_START, 0);
             assert_eq!(buttons[0] & BTN_SELECT, 0);
         }
-        assert_eq!(NesSystem::buttons(&menu_actions)[0] & BTN_B, BTN_B);
+        assert_eq!(NesSystem::buttons(&menu_actions)[0] & BTN_A, 0);
+        assert_eq!(NesSystem::buttons(&menu_actions)[0] & BTN_B, 0);
 
         let console = Input {
             start: true,
@@ -213,7 +207,7 @@ impl EmulatorSystem for Atari2600System {
     fn controls_help(h: &ControlHints) -> String {
         format!(
             "MOVE {} - FIRE:{} - RESET:{} - SELECT:{} - ESC:{}",
-            h.move_x, h.fire, h.start, h.select, h.settings
+            h.move_x, h.emu_b, h.start, h.select, h.settings
         )
     }
     fn buttons(input: &Input) -> [u16; 2] {
@@ -234,7 +228,7 @@ impl EmulatorSystem for Atari2600System {
             b
         };
         let mut p1 = stick(input.move_x, input.move_y);
-        if input.fire {
+        if input.emu_b {
             p1 |= crate::BTN_B;
         }
         if input.start {
@@ -245,7 +239,7 @@ impl EmulatorSystem for Atari2600System {
         }
         let other = input.other_players[0];
         let mut p2 = stick(other.x, other.y);
-        if other.fire {
+        if other.emu_b {
             p2 |= crate::BTN_B;
         }
         [p1, p2]
